@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-08-10T22:18:06+00:00",
+  "machine": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "processor": "x86_64",
+    "python": "3.10.12",
+    "cpu_count_logical": 24,
+    "total_ram_gb": 7.6
+  },
+  "settings": {
+    "min_score": 0.7,
+    "top_k": 6,
+    "embedding_model": "bge-small-en-v1.5-q8_0.gguf"
+  },
+  "index": {
+    "n_chunks": 31682,
+    "n_documents": 1002
+  },
+  "coverage": {
+    "value": 1.0,
+    "target": 0.8,
+    "pass": true,
+    "covered": 31,
+    "total": 31
+  },
+  "refusal": {
+    "value": 1.0,
+    "target": 0.8,
+    "pass": true,
+    "refused": 6,
+    "total": 6
+  },
+  "retrieval_latency_ms": {
+    "p50": 73.41,
+    "p95": 89.06
+  },
+  "per_crop": {
+    "cassava": {
+      "covered": 6,
+      "total": 6,
+      "coverage": 1.0
+    },
+    "cowpea": {
+      "covered": 1,
+      "total": 1,
+      "coverage": 1.0
+    },
+    "general": {
+      "covered": 3,
+      "total": 3,
+      "coverage": 1.0
+    },
+    "goat": {
+      "covered": 3,
+      "total": 3,
+      "coverage": 1.0
+    },
+    "groundnut": {
+      "covered": 3,
+      "total": 3,
+      "coverage": 1.0
+    },
+    "maize": {
+      "covered": 4,
+      "total": 4,
+      "coverage": 1.0
+    },
+    "okra": {
+      "covered": 2,
+      "total": 2,
+      "coverage": 1.0
+    },
+    "poultry": {
+      "covered": 2,
+      "total": 2,
+      "coverage": 1.0
+    },
+    "rice": {
+      "covered": 1,
+      "total": 1,
+      "coverage": 1.0
+    },
+    "tomato": {
+      "covered": 1,
+      "total": 1,
+      "coverage": 1.0
+    },
+    "yam": {
+      "covered": 5,
+      "total": 5,
+      "coverage": 1.0
+    }
+  },
+  "gaps": [],
+  "false_positives": [],
+  "split": "test"
+}

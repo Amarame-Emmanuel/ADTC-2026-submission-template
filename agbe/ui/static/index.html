@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Àgbẹ̀ — Crop Advisory</title>
+<!--
+  Everything here is inline on purpose. No CDN, no web font, no external
+  stylesheet. A page that needs the network to render would defeat the point
+  of an offline advisory system, and would fail in exactly the place it is
+  meant to work.
+
+  Styling is deliberately plain and high-contrast: the target reader is on a
+  cheap phone screen, possibly outdoors in bright sun.
+-->
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #16200f;
+    --muted: #5c6b52;
+    --line: #d9e0d2;
+    --accent: #2e6b31;
+    --accent-soft: #eef4ec;
+    --warn-bg: #fff4e5;
+    --warn-line: #d98324;
+    --warn-fg: #6b3f0a;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12160f;
+      --fg: #e8efe3;
+      --muted: #9aa992;
+      --line: #2b3427;
+      --accent: #7cc47f;
+      --accent-soft: #1c2619;
+      --warn-bg: #2e2312;
+      --warn-line: #d98324;
+      --warn-fg: #f0c78a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 1rem 4rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    max-width: 46rem;
+    margin-inline: auto;
+  }
+  header { padding: 1.5rem 0 1rem; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+  .tagline { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
+  .offline-badge {
+    display: inline-block; margin-top: 0.6rem; padding: 0.15rem 0.5rem;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em;
+  }
+
+  form { display: flex; gap: 0.5rem; margin: 1.25rem 0; flex-wrap: wrap; }
+  textarea {
+    flex: 1 1 100%; min-height: 4.5rem; padding: 0.7rem;
+    font: inherit; color: var(--fg); background: var(--bg);
+    border: 1px solid var(--line); border-radius: var(--radius); resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    padding: 0.7rem 1.4rem; font: inherit; font-weight: 600;
+    color: #fff; background: var(--accent);
+    border: 0; border-radius: var(--radius); cursor: pointer;
+  }
+  button:disabled { opacity: 0.55; cursor: default; }
+
+  .examples { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .examples button {
+    background: transparent; color: var(--muted); font-weight: 400;
+    border: 1px solid var(--line); padding: 0.3rem 0.6rem; font-size: 0.8rem;
+  }
+
+  #stage {
+    display: none; align-items: center; gap: 0.5rem;
+    color: var(--muted); font-size: 0.88rem; margin: 0.75rem 0;
+  }
+  #stage.on { display: flex; }
+  .dot {
+    width: 0.5rem; height: 0.5rem; border-radius: 50%;
+    background: var(--accent); animation: pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+  #sources { margin: 1rem 0; }
+  #sources ol { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+  #sources li { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.3rem; }
+  .label {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 600;
+  }
+
+  #answer {
+    white-space: pre-wrap; margin: 1rem 0; font-size: 1.02rem;
+    min-height: 1.5rem;
+  }
+  #answer .cursor {
+    display: inline-block; width: 0.5rem; height: 1.05rem;
+    background: var(--accent); vertical-align: text-bottom;
+    animation: pulse 0.9s steps(2) infinite;
+  }
+
+  .notice {
+    border: 1px solid var(--warn-line); border-left-width: 4px;
+    background: var(--warn-bg); color: var(--warn-fg);
+    padding: 0.8rem 1rem; border-radius: var(--radius);
+    margin: 1rem 0; font-size: 0.9rem; white-space: pre-wrap;
+  }
+  .refused {
+    border: 1px solid var(--line); border-left: 4px solid var(--muted);
+    background: var(--accent-soft); padding: 0.8rem 1rem;
+    border-radius: var(--radius); margin: 1rem 0;
+  }
+
+  #stats {
+    margin-top: 1.5rem; padding-top: 0.75rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums;
+    display: none;
+  }
+  #stats.on { display: block; }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Àgbẹ̀</h1>
+  <div class="tagline">Crop advice for cassava, maize, yam and tomato — grounded in agricultural extension documents.</div>
+  <span class="offline-badge">RUNS OFFLINE · NO CLOUD</span>
+</header>
+
+<div class="examples" id="examples">
+  <button type="button">My cassava leaves are yellow and twisted</button>
+  <button type="button">Worms are eating inside my maize funnel</button>
+  <button type="button">My tomato plants wilt but stay green</button>
+</div>
+
+<form id="form">
+  <textarea id="q" placeholder="Describe what you see on your farm…" required></textarea>
+  <button type="submit" id="send">Ask</button>
+</form>
+
+<div id="stage"><span class="dot"></span><span id="stage-text"></span></div>
+
+<div id="sources" hidden>
+  <div class="label">Sources used</div>
+  <ol id="sources-list"></ol>
+</div>
+
+<div id="answer"></div>
+<div id="notice-slot"></div>
+<div id="stats"></div>
+
+<footer>
+  Advice is drawn only from the documents listed above. It is not a substitute for
+  your local extension officer. Never apply a pesticide without reading the label.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  const form = document.getElementById("form");
+  const input = document.getElementById("q");
+  const send = document.getElementById("send");
+  const stage = document.getElementById("stage");
+  const stageText = document.getElementById("stage-text");
+  const sources = document.getElementById("sources");
+  const sourcesList = document.getElementById("sources-list");
+  const answer = document.getElementById("answer");
+  const noticeSlot = document.getElementById("notice-slot");
+  const stats = document.getElementById("stats");
+
+  document.getElementById("examples").addEventListener("click", (e) => {
+    if (e.target.tagName === "BUTTON") {
+      input.value = e.target.textContent;
+      form.requestSubmit();
+    }
+  });
+
+  function setStage(text) {
+    if (!text) { stage.classList.remove("on"); return; }
+    stageText.textContent = text;
+    stage.classList.add("on");
+  }
+
+  function reset() {
+    sources.hidden = true;
+    sourcesList.innerHTML = "";
+    answer.textContent = "";
+    noticeSlot.innerHTML = "";
+    stats.classList.remove("on");
+    stats.textContent = "";
+  }
+
+  // The response is an SSE stream delivered over POST, so EventSource (which
+  // is GET-only) cannot be used. This parses the same wire format off a
+  // fetch body reader.
+  async function ask(question) {
+    reset();
+    send.disabled = true;
+    setStage("Searching the documents…");
+
+    const cursor = document.createElement("span");
+    cursor.className = "cursor";
+
+    try {
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: question, language: "en" }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) !== -1) {
+          const raw = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+
+          const evLine = raw.match(/^event:\s*(.+)$/m);
+          const dataLine = raw.match(/^data:\s*(.+)$/m);
+          if (!evLine || !dataLine) continue;
+
+          const event = evLine[1].trim();
+          const data = JSON.parse(dataLine[1]);
+          handle(event, data, cursor);
+        }
+      }
+    } catch (err) {
+      noticeSlot.innerHTML =
+        '<div class="notice">Could not get an answer: ' + err.message + "</div>";
+    } finally {
+      cursor.remove();
+      setStage(null);
+      send.disabled = false;
+    }
+  }
+
+  function handle(event, data, cursor) {
+    if (event === "stage") {
+      setStage(data.stage === "retrieving"
+        ? "Searching the documents…"
+        : "Writing the answer…");
+
+    } else if (event === "sources") {
+      // Shown before generation starts: it is true information the reader can
+      // use during the seconds before the first token appears.
+      sourcesList.innerHTML = "";
+      data.sources.forEach((s) => {
+        const li = document.createElement("li");
+        li.textContent = "[" + s.n + "] " + s.citation;
+        sourcesList.appendChild(li);
+      });
+      sources.hidden = false;
+
+    } else if (event === "token") {
+      cursor.remove();
+      answer.appendChild(document.createTextNode(data.t));
+      answer.appendChild(cursor);
+
+    } else if (event === "refused") {
+      const div = document.createElement("div");
+      div.className = "refused";
+      div.textContent = data.message;
+      noticeSlot.appendChild(div);
+
+    } else if (event === "safety") {
+      const div = document.createElement("div");
+      div.className = "notice";
+      div.textContent = data.notice;
+      noticeSlot.appendChild(div);
+
+    } else if (event === "done") {
+      if (data.stats) {
+        stats.textContent =
+          data.stats.completion_tokens + " tokens · " +
+          "first word in " + data.stats.ttft_s + "s · " +
+          data.stats.tokens_per_second + " tokens/sec · " +
+          "generated on this device";
+        stats.classList.add("on");
+      }
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (q) ask(q);
+  });
+})();
+</script>
+</body>
+</html>

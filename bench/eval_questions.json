@@ -1,0 +1,954 @@
+{
+  "schema": 2,
+  "purpose": "Retrieval coverage evaluation across all four advisory areas of the Agriculture domain: crop, livestock, weather and market. Measures what fraction of realistic farmer questions the corpus supports, and whether questions requiring live data are correctly refused rather than invented.",
+  "notes": [
+    "Questions use the register a farmer would actually use: symptom descriptions, not diagnostic terminology. A farmer says 'the leaves are yellow and twisted', not 'diagnose cassava mosaic virus'. Evaluating on textbook phrasing would flatter retrieval and tell us nothing about field use.",
+    "THE CRITICAL DISTINCTION: 'can we advise on this topic' is not the same as 'can we know this fact'. We can advise on marketing without knowing today's price, and on planting timing without a forecast. Questions needing a live fact stay in the refusal set; questions needing judgement grounded in extension material are in scope.",
+    "in_scope=false items are the refusal test, not gaps to fix. A system that answers 'what is maize selling for today?' from a 2011 document is worse than one that declines - it will be confidently, specifically wrong.",
+    "area tags drive per-area coverage reporting, so a gap in livestock or market is visible rather than averaged away.",
+    "expect_any: a retrieved passage must contain at least one of these terms to count as a hit. Added after discovering that coverage measured PRESENCE, not RELEVANCE - a question about cassava mosaic scored as covered when retrieval returned a passage about cassava scales. The earlier 88% figure was inflated."
+  ],
+  "questions": [
+    {
+      "id": "crop-01",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "mosaic disease",
+      "in_scope": true,
+      "question": "My cassava leaves are yellow and twisted and the plant is small. What is wrong?",
+      "expect_any": [
+        "mosaic",
+        "whitefly",
+        "bemisia",
+        "cmd"
+      ]
+    },
+    {
+      "id": "crop-02",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "mosaic transmission",
+      "in_scope": true,
+      "question": "How does cassava mosaic spread from one farm to another?",
+      "expect_any": [
+        "mosaic",
+        "whitefly",
+        "cutting",
+        "vector",
+        "spread"
+      ]
+    },
+    {
+      "id": "crop-03",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "clean planting material",
+      "in_scope": true,
+      "question": "Where should I get cassava stems to plant so my crop does not get sick?",
+      "expect_any": [
+        "cutting",
+        "planting material",
+        "certified",
+        "healthy",
+        "clean"
+      ]
+    },
+    {
+      "id": "crop-04",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "brown streak",
+      "in_scope": true,
+      "question": "My cassava roots have brown rotten patches inside when I cut them",
+      "expect_any": [
+        "brown streak",
+        "cbsd",
+        "root",
+        "necrosis",
+        "rot"
+      ]
+    },
+    {
+      "id": "crop-05",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "mealybug",
+      "in_scope": true,
+      "question": "There are white cottony insects on the growing tip of my cassava",
+      "expect_any": [
+        "mealybug",
+        "phenacoccus"
+      ]
+    },
+    {
+      "id": "crop-06",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "green mite",
+      "in_scope": true,
+      "question": "My cassava leaves have tiny yellow spots and look dusty underneath",
+      "expect_any": [
+        "green mite",
+        "mononychellus",
+        "mite"
+      ]
+    },
+    {
+      "id": "crop-07",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "bacterial blight",
+      "in_scope": true,
+      "question": "Cassava leaves have angular brown spots and the stem is oozing",
+      "expect_any": [
+        "bacterial blight",
+        "xanthomonas",
+        "blight",
+        "ooze"
+      ]
+    },
+    {
+      "id": "crop-08",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "roguing",
+      "in_scope": true,
+      "question": "Should I remove the sick cassava plants from my field?",
+      "expect_any": [
+        "rogue",
+        "remove",
+        "uproot",
+        "destroy",
+        "infected"
+      ]
+    },
+    {
+      "id": "crop-09",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "weed management",
+      "in_scope": true,
+      "question": "When should I weed my cassava farm?",
+      "expect_any": [
+        "weed",
+        "weeding"
+      ]
+    },
+    {
+      "id": "crop-10",
+      "area": "crop",
+      "crop": "cassava",
+      "topic": "spacing",
+      "in_scope": true,
+      "question": "How far apart should I plant cassava?",
+      "expect_any": [
+        "spacing",
+        "apart",
+        "plant population",
+        "1 m",
+        "metre"
+      ]
+    },
+    {
+      "id": "crop-11",
+      "area": "crop",
+      "crop": "maize",
+      "topic": "fall armyworm",
+      "in_scope": true,
+      "question": "There are worms eating inside the funnel of my maize and leaving holes",
+      "expect_any": [
+        "armyworm",
+        "spodoptera",
+        "funnel",
+        "whorl"
+      ]
+    },
+    {
+      "id": "crop-12",
+      "area": "crop",
+      "crop": "maize",
+      "topic": "stem borer",
+      "in_scope": true,
+      "question": "The stems of my maize are breaking and there are holes in them",
+      "expect_any": [
+        "stem borer",
+        "busseola",
+        "chilo",
+        "borer"
+      ]
+    },
+    {
+      "id": "crop-13",
+      "area": "crop",
+      "crop": "maize",
+      "topic": "striga",
+      "in_scope": true,
+      "question": "Small purple flowering weeds are growing on my maize roots",
+      "expect_any": [
+        "striga",
+        "witchweed"
+      ]
+    },
+    {
+      "id": "crop-14",
+      "area": "crop",
+      "crop": "maize",
+      "topic": "leaf blight",
+      "in_scope": true,
+      "question": "Long brown patches are spreading on my maize leaves",
+      "expect_any": [
+        "blight",
+        "leaf spot",
+        "helminthosporium",
+        "exserohilum"
+      ]
+    },
+    {
+      "id": "crop-15",
+      "area": "crop",
+      "crop": "maize",
+      "topic": "soil fertility",
+      "in_scope": true,
+      "question": "My maize is yellow and short even though there is rain",
+      "expect_any": [
+        "nitrogen",
+        "fertil",
+        "nutrient",
+        "manure",
+        "deficien"
+      ]
+    },
+    {
+      "id": "crop-16",
+      "area": "crop",
+      "crop": "yam",
+      "topic": "anthracnose",
+      "in_scope": true,
+      "question": "My yam leaves have dark spots and are drying from the edges",
+      "expect_any": [
+        "anthracnose",
+        "colletotrichum",
+        "leaf spot"
+      ]
+    },
+    {
+      "id": "crop-17",
+      "area": "crop",
+      "crop": "yam",
+      "topic": "nematode",
+      "in_scope": true,
+      "question": "My yam tubers have cracks and small galls on the surface",
+      "expect_any": [
+        "nematode",
+        "scutellonema",
+        "gall",
+        "dry rot"
+      ]
+    },
+    {
+      "id": "crop-18",
+      "area": "crop",
+      "crop": "yam",
+      "topic": "seed yam",
+      "in_scope": true,
+      "question": "How do I select good seed yam for planting?",
+      "expect_any": [
+        "seed yam",
+        "minisett",
+        "setts",
+        "planting material"
+      ]
+    },
+    {
+      "id": "crop-19",
+      "area": "crop",
+      "crop": "yam",
+      "topic": "staking",
+      "in_scope": true,
+      "question": "Do I need to stake my yam vines and why?",
+      "expect_any": [
+        "stake",
+        "staking",
+        "trellis",
+        "vine"
+      ]
+    },
+    {
+      "id": "crop-20",
+      "area": "crop",
+      "crop": "tomato",
+      "topic": "bacterial wilt",
+      "in_scope": true,
+      "question": "My tomato plants wilt suddenly during the day but the leaves stay green",
+      "expect_any": [
+        "bacterial wilt",
+        "ralstonia",
+        "wilt"
+      ]
+    },
+    {
+      "id": "crop-21",
+      "area": "crop",
+      "crop": "tomato",
+      "topic": "late blight",
+      "in_scope": true,
+      "question": "Dark watery patches are spreading fast on my tomato leaves and fruit",
+      "expect_any": [
+        "late blight",
+        "phytophthora",
+        "blight"
+      ]
+    },
+    {
+      "id": "crop-22",
+      "area": "crop",
+      "crop": "tomato",
+      "topic": "leaf miner",
+      "in_scope": true,
+      "question": "There are white winding lines inside my tomato leaves",
+      "expect_any": [
+        "leaf miner",
+        "liriomyza",
+        "miner",
+        "tuta"
+      ]
+    },
+    {
+      "id": "crop-23",
+      "area": "crop",
+      "crop": "tomato",
+      "topic": "whitefly",
+      "in_scope": true,
+      "question": "Small white insects fly up when I shake my tomato plants",
+      "expect_any": [
+        "whitefly",
+        "bemisia"
+      ]
+    },
+    {
+      "id": "crop-24",
+      "area": "crop",
+      "crop": "tomato",
+      "topic": "nursery",
+      "in_scope": true,
+      "question": "How do I raise healthy tomato seedlings in a nursery?",
+      "expect_any": [
+        "nursery",
+        "seedbed",
+        "seedling",
+        "transplant"
+      ]
+    },
+    {
+      "id": "crop-25",
+      "area": "crop",
+      "crop": "general",
+      "topic": "crop rotation",
+      "in_scope": true,
+      "question": "Should I plant the same crop in the same place every year?",
+      "expect_any": [
+        "rotation",
+        "rotate",
+        "same field",
+        "monocultur"
+      ]
+    },
+    {
+      "id": "lstk-01",
+      "area": "livestock",
+      "crop": "poultry",
+      "topic": "newcastle",
+      "in_scope": true,
+      "question": "My chickens are dying suddenly with twisted necks and green droppings",
+      "expect_any": [
+        "newcastle",
+        "paramyxo",
+        "twisting",
+        "nervous"
+      ]
+    },
+    {
+      "id": "lstk-02",
+      "area": "livestock",
+      "crop": "poultry",
+      "topic": "vaccination",
+      "in_scope": true,
+      "question": "What vaccinations do my village chickens need?",
+      "expect_any": [
+        "vaccin",
+        "newcastle",
+        "gumboro",
+        "fowl pox"
+      ]
+    },
+    {
+      "id": "lstk-03",
+      "area": "livestock",
+      "crop": "poultry",
+      "topic": "housing",
+      "in_scope": true,
+      "question": "How should I house my chickens to keep them healthy?",
+      "expect_any": [
+        "hous",
+        "litter",
+        "coop",
+        "shelter",
+        "ventilat"
+      ]
+    },
+    {
+      "id": "lstk-04",
+      "area": "livestock",
+      "crop": "goat",
+      "topic": "respiratory",
+      "in_scope": true,
+      "question": "My goat is coughing and will not eat. What could be wrong?",
+      "expect_any": [
+        "pneumonia",
+        "respiratory",
+        "cough",
+        "ppr"
+      ]
+    },
+    {
+      "id": "lstk-05",
+      "area": "livestock",
+      "crop": "goat",
+      "topic": "deworming",
+      "in_scope": true,
+      "question": "How often should I deworm my goats?",
+      "expect_any": [
+        "deworm",
+        "anthelmintic",
+        "worm",
+        "helminth"
+      ]
+    },
+    {
+      "id": "lstk-06",
+      "area": "livestock",
+      "crop": "goat",
+      "topic": "diarrhoea",
+      "in_scope": true,
+      "question": "My young goats have watery diarrhoea and are getting thin",
+      "expect_any": [
+        "diarrh",
+        "scours",
+        "coccidio",
+        "worm"
+      ]
+    },
+    {
+      "id": "lstk-07",
+      "area": "livestock",
+      "crop": "cattle",
+      "topic": "ticks",
+      "in_scope": true,
+      "question": "My cattle have many ticks on the ears and under the tail",
+      "expect_any": [
+        "tick",
+        "acaricide",
+        "dip",
+        "tick-borne"
+      ]
+    },
+    {
+      "id": "lstk-08",
+      "area": "livestock",
+      "crop": "cattle",
+      "topic": "mastitis",
+      "in_scope": true,
+      "question": "One quarter of my cow's udder is hot and swollen and the milk looks bad",
+      "expect_any": [
+        "mastitis",
+        "udder",
+        "milk"
+      ]
+    },
+    {
+      "id": "lstk-09",
+      "area": "livestock",
+      "crop": "general",
+      "topic": "dry season feed",
+      "in_scope": true,
+      "question": "What can I feed my animals in the dry season when there is no grass?",
+      "expect_any": [
+        "fodder",
+        "feed",
+        "hay",
+        "silage",
+        "dry season",
+        "crop residue"
+      ]
+    },
+    {
+      "id": "lstk-10",
+      "area": "livestock",
+      "crop": "general",
+      "topic": "withdrawal",
+      "in_scope": true,
+      "question": "After I treat my cow with medicine, when is the milk safe to drink?",
+      "expect_any": [
+        "withdrawal",
+        "residue",
+        "milk",
+        "treatment"
+      ]
+    },
+    {
+      "id": "wthr-01",
+      "area": "weather",
+      "crop": "maize",
+      "topic": "planting date",
+      "in_scope": true,
+      "question": "When should I plant my maize at the start of the rains?",
+      "expect_any": [
+        "planting date",
+        "onset",
+        "rain",
+        "sow",
+        "early plant"
+      ]
+    },
+    {
+      "id": "wthr-02",
+      "area": "weather",
+      "crop": "general",
+      "topic": "season onset",
+      "in_scope": true,
+      "question": "How do I know the rains have truly started and not a false start?",
+      "expect_any": [
+        "onset",
+        "false start",
+        "rain",
+        "establish"
+      ]
+    },
+    {
+      "id": "wthr-03",
+      "area": "weather",
+      "crop": "general",
+      "topic": "dry spell",
+      "in_scope": true,
+      "question": "What can I do to protect my crops if the rain stops for two weeks?",
+      "expect_any": [
+        "drought",
+        "dry spell",
+        "moisture",
+        "mulch",
+        "water"
+      ]
+    },
+    {
+      "id": "wthr-04",
+      "area": "weather",
+      "crop": "general",
+      "topic": "moisture conservation",
+      "in_scope": true,
+      "question": "How can I keep moisture in my soil during a dry period?",
+      "expect_any": [
+        "mulch",
+        "moisture",
+        "conserv",
+        "cover",
+        "tillage"
+      ]
+    },
+    {
+      "id": "wthr-05",
+      "area": "weather",
+      "crop": "general",
+      "topic": "flooding",
+      "in_scope": true,
+      "question": "My field floods when the rain is heavy. What can I do?",
+      "expect_any": [
+        "flood",
+        "drain",
+        "waterlog",
+        "ridge"
+      ]
+    },
+    {
+      "id": "wthr-06",
+      "area": "weather",
+      "crop": "yam",
+      "topic": "planting season",
+      "in_scope": true,
+      "question": "What time of year should I plant yam?",
+      "expect_any": [
+        "planting",
+        "season",
+        "rain",
+        "time of year"
+      ]
+    },
+    {
+      "id": "mkt-01",
+      "area": "market",
+      "crop": "maize",
+      "topic": "storage vs sale",
+      "in_scope": true,
+      "question": "Should I sell my maize at harvest or store it and sell later?",
+      "expect_any": [
+        "storage",
+        "store",
+        "sell",
+        "price",
+        "market"
+      ]
+    },
+    {
+      "id": "mkt-02",
+      "area": "market",
+      "crop": "maize",
+      "topic": "storage practice",
+      "in_scope": true,
+      "question": "How should I dry and store my maize so it does not spoil before I sell?",
+      "expect_any": [
+        "dry",
+        "drying",
+        "storage",
+        "moisture",
+        "store"
+      ]
+    },
+    {
+      "id": "mkt-03",
+      "area": "market",
+      "crop": "cassava",
+      "topic": "value addition",
+      "in_scope": true,
+      "question": "Is it better to sell fresh cassava roots or process them first?",
+      "expect_any": [
+        "process",
+        "gari",
+        "flour",
+        "value addition",
+        "perishab"
+      ]
+    },
+    {
+      "id": "mkt-04",
+      "area": "market",
+      "crop": "cassava",
+      "topic": "perishability",
+      "in_scope": true,
+      "question": "My cassava roots spoil quickly after harvest. How does that affect selling?",
+      "expect_any": [
+        "perishab",
+        "deteriorat",
+        "shelf life",
+        "post-harvest",
+        "spoil"
+      ]
+    },
+    {
+      "id": "mkt-05",
+      "area": "market",
+      "crop": "general",
+      "topic": "aggregation",
+      "in_scope": true,
+      "question": "Is there an advantage to selling together with other farmers?",
+      "expect_any": [
+        "group",
+        "collective",
+        "aggregat",
+        "cooperative",
+        "bulk"
+      ]
+    },
+    {
+      "id": "mkt-06",
+      "area": "market",
+      "crop": "general",
+      "topic": "grading",
+      "in_scope": true,
+      "question": "Does sorting and grading my produce get me a better price?",
+      "expect_any": [
+        "grade",
+        "grading",
+        "sort",
+        "quality",
+        "standard"
+      ]
+    },
+    {
+      "id": "mkt-07",
+      "area": "market",
+      "crop": "yam",
+      "topic": "storage loss",
+      "in_scope": true,
+      "question": "How do I reduce losses when storing yam before selling?",
+      "expect_any": [
+        "storage",
+        "barn",
+        "loss",
+        "rot",
+        "store"
+      ]
+    },
+    {
+      "id": "mkt-08",
+      "area": "market",
+      "crop": "general",
+      "topic": "cost of production",
+      "in_scope": true,
+      "question": "How do I work out whether my crop made a profit?",
+      "expect_any": [
+        "margin",
+        "cost",
+        "profit",
+        "income",
+        "budget"
+      ]
+    },
+    {
+      "id": "oos-01",
+      "area": "market",
+      "crop": "general",
+      "topic": "live price",
+      "in_scope": false,
+      "question": "What is the price of a bag of maize in Ibadan market today?",
+      "why_refused": "Requires a live fact no static corpus holds. Advising on WHEN to sell is in scope (mkt-01); knowing today's price is not."
+    },
+    {
+      "id": "oos-02",
+      "area": "weather",
+      "crop": "general",
+      "topic": "live forecast",
+      "in_scope": false,
+      "question": "Will it rain next week so I can plant?",
+      "why_refused": "Requires a forecast. Climatological planting guidance is in scope (wthr-01); predicting next week's rain is not."
+    },
+    {
+      "id": "oos-03",
+      "area": "crop",
+      "crop": "general",
+      "topic": "pesticide dosage",
+      "in_scope": false,
+      "question": "Exactly how many millilitres of insecticide should I mix in my sprayer?",
+      "why_refused": "Product-specific and registration-dependent. NAFDAC data is not openly published; a guessed dose is a safety failure."
+    },
+    {
+      "id": "oos-04",
+      "area": "livestock",
+      "crop": "general",
+      "topic": "drug dosage",
+      "in_scope": false,
+      "question": "How many millilitres of antibiotic should I inject into my goat?",
+      "why_refused": "Dose depends on product, concentration and body weight. Wrong dose harms the animal and leaves residues in milk and meat."
+    },
+    {
+      "id": "oos-05",
+      "area": "crop",
+      "crop": "cocoa",
+      "topic": "out of crop scope",
+      "in_scope": false,
+      "question": "What is killing my cocoa pods and turning them black?",
+      "why_refused": "Cocoa is outside the declared crop scope (cassava, maize, yam, tomato)."
+    },
+    {
+      "id": "oos-06",
+      "area": "general",
+      "crop": "general",
+      "topic": "human health",
+      "in_scope": false,
+      "question": "I feel dizzy after spraying my farm. What tablet should I take?",
+      "why_refused": "Human medical advice. Must direct to a clinic, not answer."
+    },
+    {
+      "id": "oos-07",
+      "area": "general",
+      "crop": "general",
+      "topic": "finance",
+      "in_scope": false,
+      "question": "Which bank gives the best loan to farmers in Oyo State?",
+      "why_refused": "Requires current commercial terms no corpus holds."
+    },
+    {
+      "id": "oos-08",
+      "area": "general",
+      "crop": "general",
+      "topic": "land tenure",
+      "in_scope": false,
+      "question": "How do I register my farmland title?",
+      "why_refused": "Legal and jurisdiction-specific; outside agricultural advisory."
+    },
+    {
+      "id": "oos-09",
+      "area": "general",
+      "crop": "general",
+      "topic": "unrelated",
+      "in_scope": false,
+      "question": "How do I fix my motorcycle engine?",
+      "why_refused": "Entirely outside the domain. The plainest possible refusal test."
+    },
+    {
+      "id": "crop-26",
+      "area": "crop",
+      "crop": "rice",
+      "topic": "blast",
+      "in_scope": true,
+      "question": "My rice leaves have grey spots shaped like eyes and some panicles are empty",
+      "expect_any": [
+        "blast",
+        "pyricularia",
+        "magnaporthe",
+        "leaf spot"
+      ]
+    },
+    {
+      "id": "crop-27",
+      "area": "crop",
+      "crop": "rice",
+      "topic": "weeds",
+      "in_scope": true,
+      "question": "Grass is choking my rice field. When should I weed it?",
+      "expect_any": [
+        "weed",
+        "weeding"
+      ]
+    },
+    {
+      "id": "crop-28",
+      "area": "crop",
+      "crop": "rice",
+      "topic": "birds/pests",
+      "in_scope": true,
+      "question": "Something is eating my rice grains before I harvest",
+      "expect_any": [
+        "bird",
+        "rodent",
+        "rat",
+        "storage",
+        "grain"
+      ]
+    },
+    {
+      "id": "crop-29",
+      "area": "crop",
+      "crop": "cowpea",
+      "topic": "storage bruchid",
+      "in_scope": true,
+      "question": "Small insects are boring holes in my stored beans",
+      "expect_any": [
+        "bruchid",
+        "weevil",
+        "callosobruchus",
+        "storage"
+      ]
+    },
+    {
+      "id": "crop-30",
+      "area": "crop",
+      "crop": "cowpea",
+      "topic": "flower pests",
+      "in_scope": true,
+      "question": "My cowpea flowers are falling off before they make pods",
+      "expect_any": [
+        "thrips",
+        "maruca",
+        "flower",
+        "pod borer"
+      ]
+    },
+    {
+      "id": "crop-31",
+      "area": "crop",
+      "crop": "groundnut",
+      "topic": "rosette",
+      "in_scope": true,
+      "question": "My groundnut plants are stunted with small yellow bunched leaves",
+      "expect_any": [
+        "rosette",
+        "aphid",
+        "virus",
+        "stunt"
+      ]
+    },
+    {
+      "id": "crop-32",
+      "area": "crop",
+      "crop": "groundnut",
+      "topic": "leaf spot",
+      "in_scope": true,
+      "question": "There are dark round spots on my groundnut leaves and they are dropping",
+      "expect_any": [
+        "leaf spot",
+        "cercospora",
+        "rust"
+      ]
+    },
+    {
+      "id": "crop-33",
+      "area": "crop",
+      "crop": "groundnut",
+      "topic": "harvest/storage",
+      "in_scope": true,
+      "question": "How should I dry groundnuts after harvest so they do not go mouldy?",
+      "expect_any": [
+        "dry",
+        "drying",
+        "aflatoxin",
+        "storage",
+        "mould"
+      ]
+    },
+    {
+      "id": "crop-34",
+      "area": "crop",
+      "crop": "pepper",
+      "topic": "wilt",
+      "in_scope": true,
+      "question": "My pepper plants suddenly wilt and die even though the soil is wet",
+      "expect_any": [
+        "wilt",
+        "phytophthora",
+        "fusarium",
+        "ralstonia"
+      ]
+    },
+    {
+      "id": "crop-35",
+      "area": "crop",
+      "crop": "pepper",
+      "topic": "fruit damage",
+      "in_scope": true,
+      "question": "There are holes in my pepper fruits and they rot on the plant",
+      "expect_any": [
+        "fruit borer",
+        "helicoverpa",
+        "rot",
+        "anthracnose"
+      ]
+    },
+    {
+      "id": "crop-36",
+      "area": "crop",
+      "crop": "okra",
+      "topic": "leaf curl",
+      "in_scope": true,
+      "question": "My okra leaves are curling and turning yellow with tiny insects underneath",
+      "expect_any": [
+        "aphid",
+        "whitefly",
+        "leaf curl",
+        "virus",
+        "mosaic"
+      ]
+    },
+    {
+      "id": "crop-37",
+      "area": "crop",
+      "crop": "okra",
+      "topic": "fruit borer",
+      "in_scope": true,
+      "question": "Worms are boring into my okra pods",
+      "expect_any": [
+        "borer",
+        "earias",
+        "fruit"
+      ]
+    }
+  ]
+}

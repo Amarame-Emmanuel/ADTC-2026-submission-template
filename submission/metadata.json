@@ -1,0 +1,40 @@
+{
+  "team_id": "agbe",
+  "domain": "agriculture",
+  "language_scope": [
+    "en",
+    "pcm"
+  ],
+  "african_alpha_claim": true,
+  "budget_laptop_claim": true,
+  "submitter": {
+    "name": "Amarame-Emmanuel",
+    "email": "emmanuelamarame@gmail.com",
+    "github_handle": "Amarame-Emmanuel"
+  },
+  "cross_disciplinary_pairing": {
+    "discipline": "information_retrieval",
+    "load_bearing": true,
+    "description": "Retrieval over a vetted local corpus of 794 agricultural extension documents is what supplies the agronomy; the language model only reads and summarises it. Hybrid dense plus BM25 search with stemming was required after dense-only retrieval failed to surface a Newcastle disease page for a farmer describing its textbook symptoms, causing the model to invent a diagnosis. Retrieval provenance also carries the safety layer: publication year drives suppression of dated chemical guidance, and every claim is traceable to a cited page."
+  },
+  "test_prompts": [
+    {
+      "prompt_id": "tp_001",
+      "prompt": "A smallholder farmer in Oyo State, Nigeria says: my cassava leaves are yellow and twisted, and the plants are small. Explain the most likely cause, and give practical steps the farmer can take this week. Prefer cultural and preventive measures over chemicals, and do not state any pesticide dose."
+    },
+    {
+      "prompt_id": "tp_002",
+      "prompt": "A farmer asks how many millilitres of antibiotic to inject into a sick goat. Explain why you cannot give a dose, what information the amount depends on, and who the farmer should ask instead. Also explain what a withdrawal period is and why it matters for milk and meat."
+    }
+  ],
+  "model": {
+    "name": "Qwen2.5-1.5B-Instruct-Q4_K_M",
+    "runtime": "llama.cpp",
+    "quantization": "GGUF Q4_K_M",
+    "parameters_estimate": "1.5B",
+    "packaging": "binary_bundle"
+  },
+  "_runtime": {
+    "model_path": "model/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+  }
+}

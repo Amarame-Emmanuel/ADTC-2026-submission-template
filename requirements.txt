@@ -1,0 +1,38 @@
+# Àgbẹ̀ runtime dependencies.
+#
+# HARD RULE: PyTorch must never appear in this file, directly or transitively.
+# Torch costs ~700MB-1GB resident before any weights load, which is ~14% of the
+# 7GB ceiling spent on a framework we do not need. Every model in this system
+# runs on a C++ inference engine instead:
+#
+#   LLM + embeddings -> llama.cpp   (via llama-cpp-python)
+#   Yoruba<->English -> CTranslate2 (int8 NLLB)
+#   Leaf classifier  -> ONNX Runtime
+#
+# `make verify-no-torch` enforces this in CI and in the audit path.
+
+# --- Inference engines -------------------------------------------------------
+llama-cpp-python==0.3.2
+ctranslate2==4.5.0
+onnxruntime==1.20.1
+
+# --- Tokenisation ------------------------------------------------------------
+# transformers is used ONLY for its tokenizer classes (pure-python + tokenizers
+# rust ext). Installing it must not drag in torch; verify-no-torch checks this.
+transformers==4.47.1
+sentencepiece==0.2.0
+
+# --- Service layer -----------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+python-multipart==0.0.20
+
+# --- Numerics / utilities ----------------------------------------------------
+# numpy pinned <2 because onnxruntime 1.20 and ctranslate2 4.5 wheels are built
+# against the 1.x ABI.
+numpy==1.26.4
+Pillow==11.0.0
+psutil==6.1.1
+huggingface-hub==0.27.0
+pypdf==5.1.0

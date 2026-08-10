@@ -1,0 +1,91 @@
+{
+  "generated_at": "2026-08-07T13:44:40+00:00",
+  "host": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "python": "3.10.12",
+    "threads_configured": 4,
+    "cpu": "Intel(R) Core(TM) i7-14650HX",
+    "cpu_count_logical": 24,
+    "total_ram_gb": 7.6,
+    "cgroup_memory_limit_gb": 7.0
+  },
+  "reference_like_hardware": false,
+  "models": {
+    "llm": "qwen2.5-3b-instruct-q4_k_m.gguf",
+    "embedding": "bge-small-en-v1.5-q8_0.gguf",
+    "n_ctx": 4096,
+    "n_threads": 4
+  },
+  "memory": {
+    "peak_rss_bytes": 2648674304,
+    "peak_rss_gb": 2.467,
+    "ceiling_gb": 7.0,
+    "internal_target_gb": 5.0,
+    "under_ceiling": true,
+    "under_internal_target": true,
+    "headroom_gb": 4.533,
+    "stages_gb": {
+      "baseline": 0.033,
+      "after_index_load": 0.052,
+      "after_embedder_load": 0.113,
+      "after_llm_load": 2.265,
+      "after_generation": 2.466
+    },
+    "predicted_gb": 3.264
+  },
+  "latency": {
+    "ttft_p50_s": 73.869,
+    "ttft_p95_s": 89.739,
+    "ttft_mean_s": 79.128
+  },
+  "throughput": {
+    "tokens_per_second_p50": 20.44,
+    "tokens_per_second_mean": 20.27,
+    "mean_prompt_tokens": 1456,
+    "mean_completion_tokens": 159
+  },
+  "workload": {
+    "n_questions": 5,
+    "n_answered": 5,
+    "n_refused": 0,
+    "wall_clock_s": 435.1
+  },
+  "per_question": [
+    {
+      "question": "My cassava leaves are yellow and twisted and the plant is small. What is wrong?",
+      "refused": false,
+      "ttft_s": 87.447,
+      "tokens_per_second": 20.62,
+      "completion_tokens": 200
+    },
+    {
+      "question": "How does cassava mosaic spread from one farm to another?",
+      "refused": false,
+      "ttft_s": 72.953,
+      "tokens_per_second": 20.44,
+      "completion_tokens": 91
+    },
+    {
+      "question": "Where should I get cassava stems to plant so my crop does not get sick?",
+      "refused": false,
+      "ttft_s": 73.869,
+      "tokens_per_second": 20.23,
+      "completion_tokens": 200
+    },
+    {
+      "question": "My cassava roots have brown rotten patches inside when I cut them",
+      "refused": false,
+      "ttft_s": 71.634,
+      "tokens_per_second": 20.44,
+      "completion_tokens": 200
+    },
+    {
+      "question": "There are white cottony insects on the growing tip of my cassava",
+      "refused": false,
+      "ttft_s": 89.739,
+      "tokens_per_second": 19.61,
+      "completion_tokens": 103
+    }
+  ]
+}

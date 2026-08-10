@@ -1,0 +1,310 @@
+{
+  "schema": 1,
+  "language": "pcm_Latn",
+  "language_name": "Nigerian Pidgin",
+  "purpose": "Native-speaker validation set for Nigerian Pidgin output. This is what the Pidgin support claim rests on: we claim it because a speaker checked it, not because NLLB emitted something Pidgin-shaped.",
+  "instructions_for_reviewer": [
+    "The 'draft' field is a FIRST ATTEMPT written by the model, not by a speaker. Treat it as something to correct, not something to approve. Correcting is faster than composing from nothing, but a wrong draft you leave alone becomes a wrong reference.",
+    "Rewrite each draft the way you would ACTUALLY say it to a farmer. Naija as it is really spoken, not English with a few words changed.",
+    "Set 'draft_ok' to yes or no. If no, put your version in 'corrected'.",
+    "Items marked CRITICAL are safety messages. If those do not land as urgent and clear, the safety design fails at the last step - a farmer who does not understand a warning is not warned.",
+    "If the ENGLISH itself would confuse a farmer, say so in notes. Bad English in, bad Pidgin out.",
+    "Leave anything you are unsure about blank rather than guessing."
+  ],
+  "why_pidgin_matters": "Nigerian Pidgin has the widest reach of any language in this project - it crosses ethnic lines in a way Yoruba, Hausa and Igbo do not, and it is what many farmers actually use at market. It is also the language most likely to be mistaken for 'informal English' and translated carelessly.",
+  "safety_messages": [
+    {
+      "id": "pcm-s01",
+      "priority": "CRITICAL",
+      "purpose": "Refusal - shown when the corpus cannot answer",
+      "english": "I do not have local guidance on that in my documents, so I cannot give you a reliable answer. Please ask your local extension officer.",
+      "draft": "I no get information about dis one for di book wey I get, so I no fit give you answer wey you fit trust. Abeg go meet your extension officer.",
+      "draft_ok": "yes",
+      "corrected": "I no get information about dis one for di book wey I get, so I no fit give you answer wey you fit trust. Abeg go meet your extension officer.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s02",
+      "priority": "CRITICAL",
+      "purpose": "Banned or restricted pesticide warning",
+      "english": "Some sources mention pesticides that are banned or severely restricted in many countries. Do not use them. Ask your local extension officer which products are currently registered for your crop.",
+      "draft": "Some of di medicine wey dis book talk about, plenty country don ban am. No use am at all. Ask your extension officer which one dem allow for your crop now.",
+      "draft_ok": "yes",
+      "corrected": "Some of di medicine wey dis book talk about, plenty country don ban am. No use am at all. Ask your extension officer which one dem allow for your crop now.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s03",
+      "priority": "CRITICAL",
+      "purpose": "Dosage redaction - a rate was invented and removed",
+      "english": "This answer contained application rates that are not stated in the source documents, so they have been removed. Never guess a dose - ask an extension officer or read the product label.",
+      "draft": "Di answer bin get quantity wey no dey inside di book, so I comot am. Never guess how much you go use - ask extension officer or read wetin dem write for di container.",
+      "draft_ok": "yes",
+      "corrected": "Di answer bin get quantity wey no dey inside di book, so I comot am. Never guess how much you go use - ask extension officer or read wetin dem write for di container.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s04",
+      "priority": "CRITICAL",
+      "purpose": "Veterinary withdrawal period",
+      "english": "IMPORTANT: after treating an animal with medicine, there is a withdrawal period before its milk or meat is safe for people to consume. Ask a veterinary officer how long to wait before selling or drinking the milk, or slaughtering the animal.",
+      "draft": "IMPORTANT: after you give animal medicine, e get time wey you must wait before di milk or di meat go safe for person to chop. Ask veterinary officer how many day you go wait before you sell am, drink di milk, or kill di animal.",
+      "draft_ok": "yes",
+      "corrected": "IMPORTANT: after you give animal medicine, e get time wey you must wait before di milk or di meat go safe for person to chop. Ask veterinary officer how many day you go wait before you sell am, drink di milk, or kill di animal.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s05",
+      "priority": "CRITICAL",
+      "purpose": "Stale chemical guidance",
+      "english": "Chemical control guidance here comes from older documents. Pesticide registrations change; confirm with an extension officer before applying anything.",
+      "draft": "Dis advice about chemical come from old book. Di rule for pesticide dey change, so confirm with extension officer before you use anything.",
+      "draft_ok": "yes",
+      "corrected": "Dis advice about chemical come from old book. Di rule for pesticide dey change, so confirm with extension officer before you use anything.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s06",
+      "priority": "CRITICAL",
+      "purpose": "Dosage question refused before answering",
+      "english": "I cannot tell you how much to use. The correct amount depends on the specific product and what is registered for your crop or animal. Read the product label, or ask your extension officer.",
+      "draft": "I no fit tell you how much you go use. Di correct quantity depend on di particular product and wetin dem register for your crop or your animal. Read di label for di container, or ask your extension officer.",
+      "draft_ok": "yes",
+      "corrected": "I no fit tell you how much you go use. Di correct quantity depend on di particular product and wetin dem register for your crop or your animal. Read di label for di container, or ask your extension officer.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-s07",
+      "priority": "CRITICAL",
+      "purpose": "Human medical - pesticide exposure",
+      "english": "If you feel unwell after handling farm chemicals, stop work, wash thoroughly, and go to a clinic or hospital now. Take the product container with you so they know what you were exposed to.",
+      "draft": "If your body no dey okay after you touch farm chemical, stop work, wash yourself well well, and go clinic or hospital now now. Carry di container go so dem go sabi wetin enter your body.",
+      "draft_ok": "yes",
+      "corrected": "If your body no dey okay after you touch farm chemical, stop work, wash yourself well well, and go clinic or hospital now now. Carry di container go so dem go sabi wetin enter your body.",
+      "notes": ""
+    }
+  ],
+  "advisory_samples": [
+    {
+      "id": "pcm-a01",
+      "priority": "normal",
+      "purpose": "Disease identification",
+      "english": "Your cassava has mosaic disease. The leaves become yellow and twisted, and the plant stays small.",
+      "draft": "Na mosaic disease dey worry your cassava. Di leaf go turn yellow and twist, and di plant no go grow big.",
+      "draft_ok": "yes",
+      "corrected": "Na mosaic disease dey worry your cassava. Di leaf go turn yellow and twist, and di plant no go grow big.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a02",
+      "priority": "normal",
+      "purpose": "Cultural control instruction",
+      "english": "Remove the infected plants and destroy them away from your farm.",
+      "draft": "Comot di plant wey don catch di sickness, carry am go far from your farm, then destroy am.",
+      "draft_ok": "yes",
+      "corrected": "Comot di plant wey don catch di sickness, carry am go far from your farm, then destroy am.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a03",
+      "priority": "normal",
+      "purpose": "Clean planting material",
+      "english": "Only take stem cuttings from healthy plants that show no symptoms.",
+      "draft": "Na only from plant wey healthy, wey no show any sign of sickness, you go cut stem take plant.",
+      "draft_ok": "yes",
+      "corrected": "Na only from plant wey healthy, wey no show any sign of sickness, you go cut stem take plant.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a04",
+      "priority": "normal",
+      "purpose": "Vector explanation",
+      "english": "Whiteflies carry the virus from one plant to another.",
+      "draft": "Na whitefly dey carry di virus from one plant go anoda one.",
+      "draft_ok": "yes",
+      "corrected": "Na whitefly dey carry di virus from one plant go anoda one.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a05",
+      "priority": "normal",
+      "purpose": "Poultry disease",
+      "english": "These signs suggest Newcastle disease. Separate the sick birds immediately and dispose of dead birds properly.",
+      "draft": "Dis sign dem show say na Newcastle disease. Separate di fowl wey sick sharp sharp, and bury di ones wey don die well well.",
+      "draft_ok": "yes",
+      "corrected": "Dis sign dem show say na Newcastle disease. Separate di fowl wey sick sharp sharp, and bury di ones wey don die well well.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a06",
+      "priority": "normal",
+      "purpose": "Market decision",
+      "english": "Store the maize and sell it later, but dry it well first so weevils do not spoil it.",
+      "draft": "Keep di corn make you sell am later, but dry am well well first so weevil no go spoil am.",
+      "draft_ok": "yes",
+      "corrected": "Keep di corn make you sell am later, but dry am well well first so weevil no go spoil am.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a07",
+      "priority": "normal",
+      "purpose": "Timing / weather",
+      "english": "Wait until the rains are steady before you plant, not after the first shower.",
+      "draft": "Wait make di rain steady before you plant, no be after di first rain wey fall.",
+      "draft_ok": "yes",
+      "corrected": "Wait make di rain steady before you plant, no be after di first rain wey fall.",
+      "notes": ""
+    },
+    {
+      "id": "pcm-a08",
+      "priority": "normal",
+      "purpose": "Scouting instruction",
+      "english": "Check your field every week and look under the leaves for insects.",
+      "draft": "Check your farm every week, and look under di leaf make you see if insect dey.",
+      "draft_ok": "yes",
+      "corrected": "Check your farm every week, and look under di leaf make you see if insect dey.",
+      "notes": ""
+    }
+  ],
+  "terminology": [
+    {
+      "english": "cassava",
+      "draft": "cassava",
+      "corrected": "cassava",
+      "notes": ""
+    },
+    {
+      "english": "maize",
+      "draft": "corn",
+      "corrected": "corn",
+      "notes": ""
+    },
+    {
+      "english": "yam",
+      "draft": "yam",
+      "corrected": "yam",
+      "notes": ""
+    },
+    {
+      "english": "tomato",
+      "draft": "tomato",
+      "corrected": "tomato",
+      "notes": ""
+    },
+    {
+      "english": "leaves",
+      "draft": "leaf",
+      "corrected": "leaf",
+      "notes": ""
+    },
+    {
+      "english": "stem cutting",
+      "draft": "stem wey dem cut",
+      "corrected": "stem wey dem cut",
+      "notes": ""
+    },
+    {
+      "english": "disease",
+      "draft": "sickness",
+      "corrected": "sickness",
+      "notes": ""
+    },
+    {
+      "english": "pest / insect",
+      "draft": "insect",
+      "corrected": "insect",
+      "notes": ""
+    },
+    {
+      "english": "wilting",
+      "draft": "di plant dey bow",
+      "corrected": "di plant dey bow",
+      "notes": ""
+    },
+    {
+      "english": "yellowing",
+      "draft": "e dey turn yellow",
+      "corrected": "e dey turn yellow",
+      "notes": ""
+    },
+    {
+      "english": "rot",
+      "draft": "e don rotten",
+      "corrected": "e don rotten",
+      "notes": ""
+    },
+    {
+      "english": "to spray",
+      "draft": "spray",
+      "corrected": "spray",
+      "notes": ""
+    },
+    {
+      "english": "pesticide",
+      "draft": "medicine for insect",
+      "corrected": "medicine for insect",
+      "notes": ""
+    },
+    {
+      "english": "extension officer",
+      "draft": "extension officer",
+      "corrected": "extension officer",
+      "notes": ""
+    },
+    {
+      "english": "veterinary officer",
+      "draft": "vet doctor",
+      "corrected": "vet doctor",
+      "notes": ""
+    },
+    {
+      "english": "harvest",
+      "draft": "harvest",
+      "corrected": "harvest",
+      "notes": ""
+    },
+    {
+      "english": "planting material",
+      "draft": "wetin you go plant",
+      "corrected": "wetin you go plant",
+      "notes": ""
+    },
+    {
+      "english": "weeding",
+      "draft": "clear grass",
+      "corrected": "clear grass",
+      "notes": ""
+    },
+    {
+      "english": "soil",
+      "draft": "ground",
+      "corrected": "ground",
+      "notes": ""
+    },
+    {
+      "english": "chickens",
+      "draft": "fowl",
+      "corrected": "fowl",
+      "notes": ""
+    },
+    {
+      "english": "goat",
+      "draft": "goat",
+      "corrected": "goat",
+      "notes": ""
+    },
+    {
+      "english": "withdrawal period",
+      "draft": "di time wey you go wait before you chop am",
+      "corrected": "di time wey you go wait before you chop am",
+      "notes": ""
+    }
+  ],
+  "review": {
+    "status": "approved",
+    "reviewed_by": "project submitter (Nigerian Pidgin speaker)",
+    "date": "2026-08-07",
+    "method": "blanket approval",
+    "method_note": "The reviewer read the full draft set and approved it as a whole, rather than marking each row individually. This is genuine native-speaker validation and is recorded as such, but it is weaker evidence than per-row correction: a blanket pass cannot distinguish a line that is right from one the reviewer skimmed. Stated plainly here so REPORT.md can describe the basis of the African-language claim accurately rather than implying line-by-line verification."
+  }
+}

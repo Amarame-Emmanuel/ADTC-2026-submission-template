@@ -1,0 +1,60 @@
+# Build-time-only image for converting NLLB-200 to CTranslate2 format.
+#
+# WHY THIS IMAGE EXISTS
+#
+# `ct2-transformers-converter` loads the Hugging Face checkpoint with PyTorch
+# to read its weights. Torch is therefore unavoidable *at conversion time* -
+# but it is a build dependency, not a runtime one, exactly like a compiler.
+#
+# Keeping it in a separate image means the runtime image stays torch-free and
+# the memory budget in REPORT.md is a claim about what actually ships, not an
+# aspiration. This image is built once, run once, and then irrelevant: the
+# artifact it produces (an int8 CT2 model directory) is what the runtime loads.
+#
+# Nothing here affects the 7 GB ceiling. Conversion happens on the developer's
+# machine; the target laptop only ever sees the converted output.
+
+FROM python:3.10-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# CPU-only torch: the GPU build is several GB larger and buys us nothing, since
+# conversion is a one-shot weight-format rewrite, not training.
+RUN pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1
+
+RUN pip install \
+        ctranslate2==4.5.0 \
+        transformers==4.47.1 \
+        sentencepiece==0.2.0 \
+        huggingface-hub==0.27.0
+
+WORKDIR /work
+
+# Converts facebook/nllb-200-distilled-600M -> int8 CTranslate2.
+#
+# int8 rather than int8_float16: the target has no GPU and AVX2-class integer
+# kernels are what CTranslate2 will actually dispatch to on an i5. float16 on
+# CPU would be emulated and slower.
+#
+# The tokenizer files are copied alongside the converted model so the runtime
+# needs no network access and no transformers model download - only the
+# tokenizer, which is pure Python plus the rust `tokenizers` extension.
+CMD ["bash", "-lc", "\
+set -euo pipefail; \
+OUT=/work/models/nllb-200-distilled-600M-int8; \
+if [ -d \"$OUT\" ]; then echo \"already converted: $OUT\"; exit 0; fi; \
+echo 'converting NLLB-200-distilled-600M -> CTranslate2 int8 ...'; \
+ct2-transformers-converter \
+    --model facebook/nllb-200-distilled-600M \
+    --output_dir \"$OUT\" \
+    --quantization int8 \
+    --copy_files tokenizer.json tokenizer_config.json special_tokens_map.json sentencepiece.bpe.model; \
+echo 'conversion complete:'; du -sh \"$OUT\" \
+"]

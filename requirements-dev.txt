@@ -1,0 +1,16 @@
+# Test-only dependencies.
+#
+# Kept separate from requirements.txt and installed in a later Docker layer so
+# that adding a test tool never invalidates the llama-cpp-python layer, which
+# takes several minutes to compile. On a slow connection that separation is the
+# difference between a 20-second rebuild and a 40-minute one.
+#
+# Present in the runtime image on purpose: `make test` is part of the Gate 2
+# reproducibility path, and an auditor should not have to build a second image
+# to run the suite.
+
+pytest==8.3.4
+
+# TestClient needs httpx; without it the UI cannot be exercised in tests at all,
+# which is how a 500 in the server path went unnoticed until a human hit it.
+httpx==0.28.1

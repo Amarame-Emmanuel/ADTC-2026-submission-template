@@ -1,0 +1,17 @@
+# This repository is authored on Windows and executed on Ubuntu 22.04.
+#
+# Without this file, Git's autocrlf would hand the Gate 2 auditor a checkout
+# with CRLF line endings: broken shebangs, a Makefile that fails with opaque
+# errors, and shell scripts that die on `\r`. Forcing LF everywhere makes the
+# checkout identical on every platform.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.mp4    binary
+*.gguf   binary
+*.onnx   binary
+*.bin    binary
+*.pdf    binary

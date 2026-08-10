@@ -1,0 +1,46 @@
+# Keep the build context small and the image reproducible.
+#
+# models/, corpus/ and index/ are bind-mounted at run time (see Makefile), so
+# baking them into the image would duplicate gigabytes and make the image
+# depend on whatever happened to be on the builder's disk.
+
+# The whole corpus tree is bind-mounted at run time (see Makefile MOUNTS), so
+# nothing under it belongs in the image.
+#
+# This previously read `corpus/raw/` plus a bare `*.zip`, and .dockerignore
+# patterns DO NOT RECURSE: `*.zip` matches only top-level files, so the 1.8 GB
+# Infonet archive at corpus/external/infonet.zip was copied in. That inflated
+# the image from 1.55 GB to 5.41 GB and - far worse - would have had the image
+# redistribute CC BY-NC-SA material, defeating the entire reason the corpus is
+# fetched by manifest rather than committed.
+models/
+index/
+corpus/
+bench/traces/
+bench/results/
+
+.git/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+tests/fixtures/
+docs/assets/
+
+# Recursive forms. Bare `*.ext` only matches the build-context root.
+**/*.gguf
+**/*.onnx
+**/*.bin
+**/*.safetensors
+**/*.pdf
+**/*.zip
+**/*.mp4
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
