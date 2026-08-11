@@ -1,8 +1,30 @@
 # Corpus licences
 
-Generated from corpus/manifest.json. Documents are NOT redistributed in this
-repository - only their provenance is. Run scripts/fetch_corpus.py to obtain
-them; each is verified against the SHA-256 recorded in the manifest.
+Compiled by hand from corpus/manifest.json during the licence audit (an earlier
+version of this header claimed a generator that does not exist). Documents are
+NOT redistributed in this repository - only their provenance is. Run
+scripts/fetch_corpus.py to obtain them; each is verified against the SHA-256
+recorded in the manifest.
+
+## Excluded at runtime: NoDerivatives and proprietary (7 documents)
+
+The seven documents below are in the manifest and were indexed before the
+fetch gate learned to reject their licences. They are now **excluded at index
+load** (`agbe/rag/licences.py`, enforced in `VectorIndex.load`): their 1,723
+chunks and vector rows are dropped before any query runs, so the shipped
+system cannot retrieve from them. The next full re-index removes them from the
+artifact permanently.
+
+| Licence | Documents | Why excluded |
+|---|---|---|
+| CC-BY-ND-4.0 | 3 | chunking/embedding is arguably a derivative work; "arguably" is not a position this submission takes |
+| CC-BY-NC-ND-4.0 | 2 | as above |
+| Copyrighted; Non-commercial use only | 2 | proprietary terms, no derivative or redistribution rights to rely on |
+
+Measured effect of exclusion: held-out coverage and refusal both unchanged at
+100% (31/31, 6/6). Two of the ND documents were also the top noise sources in
+the REPORT §6.3 retrieval failure, so the exclusion improved retrieval and
+settled the licence question in the same move.
 
 **214 documents** from 1 institutional sources.
 

@@ -125,7 +125,15 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
 
         yield sse("stage", {"stage": "retrieving"})
 
-        hits = engine.retrieve(question.text)
+        # retrieve_and_compress, never retrieve: it is the entry point that
+        # carries Pidgin normalisation, instruction stripping and context
+        # compression. This line previously called engine.retrieve(), which
+        # has none of those - so the browser, the one surface a judge
+        # actually touches, was excluded from every retrieval fix and still
+        # sent ~2,100-token prompts at 65s to first token. The generation
+        # loop below it had been copy-pasted too; it now lives in ONE place,
+        # engine.guarded_stream().
+        hits, texts, _comp = engine.retrieve_and_compress(question.text)
 
         if not hits:
             # The refusal path. Emitted as its own event so the interface can
@@ -152,36 +160,14 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
 
         yield sse("stage", {"stage": "writing"})
 
-        from agbe.advisor import build_prompt
-        from agbe.rag.safety import _normalise_for_containment, find_dosages
-
-        sources_norm = _normalise_for_containment("\n".join(h.chunk.text for h in hits))
         answer_parts: list[str] = []
-        buffer = ""
-        guarding = False
         stats = None
 
-        for piece, stats in engine.llm.stream(build_prompt(question.text, hits)):
-            if not guarding and any(ch.isdigit() for ch in piece):
-                guarding = True
-
-            if not guarding:
-                answer_parts.append(piece)
-                yield sse("token", {"t": piece})
-                continue
-
-            buffer += piece
-            if any(end in buffer for end in (". ", "! ", "? ", "\n")):
-                released = engine._release(buffer, sources_norm)
-                answer_parts.append(released)
-                yield sse("token", {"t": released})
-                buffer = ""
-                guarding = False
-
-        if buffer:
-            released = engine._release(buffer, sources_norm)
-            answer_parts.append(released)
-            yield sse("token", {"t": released})
+        for piece, piece_stats in engine.guarded_stream(question.text, hits, texts):
+            if piece_stats is not None:
+                stats = piece_stats
+            answer_parts.append(piece)
+            yield sse("token", {"t": piece})
 
         # Post-hoc safety check over the whole answer: catches hazardous
         # actives and wholly-stale chemical sourcing, which are properties of

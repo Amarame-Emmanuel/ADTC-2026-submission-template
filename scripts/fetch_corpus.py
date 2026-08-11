@@ -340,9 +340,6 @@ def vet(ind: dict) -> tuple[bool, str]:
         return False, f"access rights: {access or 'unspecified'}"
 
     licence = meta(md, "dcterms.license")
-    low_licence = licence.lower()
-    if "all rights reserved" in low_licence:
-        return False, "licence: all rights reserved"
 
     # NoDerivatives. An audit found seven documents already in the corpus
     # carrying CC-BY-ND-4.0, CC-BY-NC-ND-4.0 or "Copyrighted; Non-commercial
@@ -357,10 +354,13 @@ def vet(ind: dict) -> tuple[bool, str]:
     #
     # Documents already indexed under these terms are recorded in
     # corpus/licenses/README.md rather than silently dropped.
-    if re.search(r"\bnd-\d|noderiv|no derivative", low_licence):
-        return False, f"licence: NoDerivatives ({licence})"
-    if "copyrighted" in low_licence:
-        return False, f"licence: {licence}"
+    # Shared predicate: the same rule the index enforces at load time, so the
+    # gate and the runtime can never disagree about what is admissible.
+    from agbe.rag.licences import excluded as licence_excluded
+
+    is_excluded, why = licence_excluded(licence)
+    if is_excluded:
+        return False, f"licence: {why}"
 
     doc_type = meta(md, "dcterms.type").strip().lower()
     if doc_type not in EXTENSION_TYPES:

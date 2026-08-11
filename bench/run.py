@@ -190,7 +190,15 @@ def run_benchmark(n_questions: int, max_tokens: int) -> dict:
 
     started = time.perf_counter()
     for question in questions:
-        hits = engine.retrieve(question)
+        # Compress, because the shipped paths compress.
+        #
+        # This benchmark used to call engine.retrieve() and send full chunk
+        # text, while advise() sent compressed passages. It was therefore
+        # timing a configuration no user could reach: ~2,100 prompt tokens
+        # against the ~900 the application actually sends, and 65s to first
+        # token instead of what a farmer waits. A benchmark measuring a path
+        # nothing else uses is worse than no benchmark, because it is believed.
+        hits, texts, _comp = engine.retrieve_and_compress(question)
         if not hits:
             refusals += 1
             per_question.append({"question": question, "refused": True})
@@ -198,15 +206,12 @@ def run_benchmark(n_questions: int, max_tokens: int) -> dict:
 
         from agbe.advisor import build_prompt
 
-        _, stats = engine.llm.complete(
-            build_prompt(question, hits), max_tokens=max_tokens
-        )
+        prompt = build_prompt(question, hits, texts)
+        _, stats = engine.llm.complete(prompt, max_tokens=max_tokens)
         ttfts.append(stats.time_to_first_token_s)
         rates.append(stats.tokens_per_second)
         completion_tokens.append(stats.completion_tokens)
-        prompt_tokens.append(engine.llm.count_tokens(
-            build_prompt(question, hits)[1]["content"]
-        ))
+        prompt_tokens.append(engine.llm.count_tokens(prompt[1]["content"]))
         per_question.append({
             "question": question,
             "refused": False,

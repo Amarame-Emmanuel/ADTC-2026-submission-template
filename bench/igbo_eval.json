@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "language": "ibo",
+  "language_name": "Igbo",
+  "purpose": "Native-speaker validation set. Strings here reach farmers verbatim once validated and added to agbe/translate/messages.py. Unreviewed rows are excluded from any claim.",
+  "instructions_for_reviewer": "Fill the last column of the exported CSV: OK approves, anything else replaces. Draft cells are EMPTY on purpose - machine drafts were measured deleting prohibition clauses in this language pair and are not offered. Compose from the English.",
+  "safety_messages": [
+    {
+      "id": "ibo-s01",
+      "priority": "CRITICAL",
+      "purpose": "Refusal - shown when the corpus cannot answer",
+      "english": "I do not have local guidance on that in my documents, so I cannot give you a reliable answer. Please ask your local extension officer.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s02",
+      "priority": "CRITICAL",
+      "purpose": "Warning - a cited pesticide is hazardous/banned",
+      "english": "Some sources mention pesticides that are banned or severely restricted in many countries. Do not use them. Ask your local extension officer which products are currently registered for your crop.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s03",
+      "priority": "CRITICAL",
+      "purpose": "A dosage in the answer is not in the sources",
+      "english": "This answer contained application rates that are not stated in the source documents, so they have been removed. Never guess a dose - ask an extension officer or read the product label.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s04",
+      "priority": "CRITICAL",
+      "purpose": "Chemical advice comes only from old documents",
+      "english": "Chemical control guidance here comes from older documents. Pesticide registrations change; confirm with an extension officer before applying anything.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s05",
+      "priority": "CRITICAL",
+      "purpose": "Refusal to state any pesticide/drug dose",
+      "english": "I cannot tell you how much to use. The correct amount depends on the specific product and what is registered for your crop or animal. Read the product label, or ask your extension officer.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s06",
+      "priority": "CRITICAL",
+      "purpose": "Veterinary withdrawal period - milk/meat safety",
+      "english": "IMPORTANT: after treating an animal with medicine, there is a withdrawal period before its milk or meat is safe for people to consume. Ask a veterinary officer how long to wait before selling or drinking the milk, or slaughtering the animal.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s07",
+      "priority": "CRITICAL",
+      "purpose": "Redirect to a clinic - human health symptom",
+      "english": "If you feel unwell after handling farm chemicals, stop work, wash thoroughly, and go to a clinic or hospital now. Take the product container with you so they know what you were exposed to.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-s08",
+      "priority": "normal",
+      "purpose": "Polite refusal for crops we do not cover",
+      "english": "I do not cover that crop. My documents are about cassava, maize, yam, tomato, rice, cowpea, groundnut, pepper and okra, and about livestock. Please ask your extension officer.",
+      "draft": ""
+    }
+  ],
+  "advisory_samples": [
+    {
+      "id": "ibo-a01",
+      "priority": "normal",
+      "purpose": "Disease identification",
+      "english": "Your cassava has mosaic disease. The leaves become yellow and twisted, and the plant stays small.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a02",
+      "priority": "normal",
+      "purpose": "Cultural control instruction",
+      "english": "Remove the infected plants and destroy them away from your farm.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a03",
+      "priority": "normal",
+      "purpose": "Clean planting material",
+      "english": "Only take stem cuttings from healthy plants that show no symptoms.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a04",
+      "priority": "normal",
+      "purpose": "Vector explanation",
+      "english": "Whiteflies carry the virus from one plant to another.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a05",
+      "priority": "normal",
+      "purpose": "Poultry disease",
+      "english": "These signs suggest Newcastle disease. Separate the sick birds immediately and dispose of dead birds properly.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a06",
+      "priority": "normal",
+      "purpose": "Market decision",
+      "english": "Store the maize and sell it later, but dry it well first so weevils do not spoil it.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a07",
+      "priority": "normal",
+      "purpose": "Timing / weather",
+      "english": "Wait until the rains are steady before you plant, not after the first shower.",
+      "draft": ""
+    },
+    {
+      "id": "ibo-a08",
+      "priority": "normal",
+      "purpose": "Scouting instruction",
+      "english": "Check your field every week and look under the leaves for insects.",
+      "draft": ""
+    }
+  ],
+  "terminology": [
+    {
+      "english": "cassava",
+      "draft": ""
+    },
+    {
+      "english": "maize",
+      "draft": ""
+    },
+    {
+      "english": "yam",
+      "draft": ""
+    },
+    {
+      "english": "tomato",
+      "draft": ""
+    },
+    {
+      "english": "leaves",
+      "draft": ""
+    },
+    {
+      "english": "stem cutting",
+      "draft": ""
+    },
+    {
+      "english": "disease",
+      "draft": ""
+    },
+    {
+      "english": "pest / insect",
+      "draft": ""
+    },
+    {
+      "english": "wilting",
+      "draft": ""
+    },
+    {
+      "english": "yellowing",
+      "draft": ""
+    },
+    {
+      "english": "rot",
+      "draft": ""
+    },
+    {
+      "english": "to spray",
+      "draft": ""
+    },
+    {
+      "english": "pesticide",
+      "draft": ""
+    },
+    {
+      "english": "extension officer",
+      "draft": ""
+    },
+    {
+      "english": "veterinary officer",
+      "draft": ""
+    },
+    {
+      "english": "harvest",
+      "draft": ""
+    },
+    {
+      "english": "planting material",
+      "draft": ""
+    },
+    {
+      "english": "weeding",
+      "draft": ""
+    },
+    {
+      "english": "soil",
+      "draft": ""
+    },
+    {
+      "english": "chickens",
+      "draft": ""
+    },
+    {
+      "english": "goat",
+      "draft": ""
+    },
+    {
+      "english": "withdrawal period",
+      "draft": ""
+    }
+  ],
+  "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "date": null
+  }
+}

@@ -132,6 +132,7 @@ class VectorIndex:
         retrieved; the dense score decides whether it is good enough to use.
         """
         from agbe.rag.lexical import reciprocal_rank_fusion
+        from agbe.rag.quality import is_usable
 
         if len(self) == 0:
             return []
@@ -147,7 +148,11 @@ class VectorIndex:
         lexical_ranked = self.bm25.search(query_text, top_k=candidates)
         lexical_top = [idx for idx, _ in lexical_ranked]
 
-        fused = reciprocal_rank_fusion(dense_top, lexical_top, top_k=top_k)
+        # Fuse over more candidates than requested. Chunks rejected below for
+        # being front matter or OCR debris are then REPLACED by the next
+        # acceptable passage rather than simply lost, so filtering does not
+        # quietly shrink the evidence the model gets.
+        fused = reciprocal_rank_fusion(dense_top, lexical_top, top_k=top_k * 3)
 
         # Passages the lexical ranker put at the very top are exempt from the
         # dense floor.
@@ -167,6 +172,8 @@ class VectorIndex:
 
         hits: list[SearchHit] = []
         for rank, idx in enumerate(fused):
+            if len(hits) >= top_k:
+                break
             score = float(dense_scores[idx])
             floor = (
                 min_score - LEXICAL_FLOOR_TOLERANCE
@@ -175,6 +182,15 @@ class VectorIndex:
             )
             if score < floor:
                 continue
+
+            # Title pages and OCR debris embed as plausible text - they carry
+            # the document title and crop names, and score well - while
+            # containing no guidance. See agbe/rag/quality.py for the passages
+            # that motivated this.
+            ok, _why = is_usable(self.chunks[idx].text)
+            if not ok:
+                continue
+
             hits.append(SearchHit(chunk=self.chunks[idx], score=score, rank=rank))
         return hits
 
@@ -229,6 +245,22 @@ class VectorIndex:
         vectors = np.load(vectors_path, mmap_mode="r")
         raw = json.loads(chunks_path.read_text(encoding="utf-8"))
         chunks = [Chunk(**c) for c in raw]
+
+        # Licence enforcement at load, not only at fetch. The fetch gate
+        # learned to reject NoDerivatives after five documents were already
+        # embedded, and a re-index costs hours; dropping their chunks (and the
+        # matching vector rows) here means the shipped system cannot retrieve
+        # from them regardless of what the index on disk contains. See
+        # agbe/rag/licences.py for why these five mattered doubly.
+        from agbe.rag.licences import excluded
+
+        keep = [i for i, c in enumerate(chunks) if not excluded(c.licence)[0]]
+        if len(keep) != len(chunks):
+            dropped = len(chunks) - len(keep)
+            vectors = np.asarray(vectors)[keep]
+            chunks = [chunks[i] for i in keep]
+            print(f"index: dropped {dropped} chunks from excluded-licence documents")
+
         return cls(np.asarray(vectors), chunks)
 
     @classmethod

@@ -114,9 +114,27 @@ fetch-models:
 # that carries PyTorch. Torch is a BUILD dependency here, like a compiler: the
 # runtime image never contains it, which is what makes the memory budget in
 # REPORT.md a description of what ships rather than an aspiration.
+#
+# The HF cache volume is mounted for the same reason fetch-models mounts it:
+# NLLB-200-distilled-600M is a ~2.5 GB download, and a stall partway through
+# should resume rather than start over. This was learned by watching a run sit
+# at exactly 1,000,000,000 bytes for an hour.
+#
+# MSYS_NO_PATHCONV=1 is not optional on Windows. Git Bash rewrites arguments
+# that look like Unix paths, and it mangles the -v argument into
+#
+#   C:\...\LLM\models;C  ->  \Program Files\Git\work\models
+#
+# which Docker accepts silently. The conversion then runs to completion and
+# writes its output into a directory nobody will ever look in. This has now
+# cost two multi-gigabyte downloads; the export makes the target safe to run
+# from any shell.
 convert-models:
 	docker build -f docker/Dockerfile.convert -t agbe-convert:latest .
-	docker run --rm -v "$(CURDIR)/models:/work/models" agbe-convert:latest
+	MSYS_NO_PATHCONV=1 docker run --rm \
+		-v "$(CURDIR)/models:/work/models" \
+		-v "agbe-hf-cache:/root/.cache/huggingface" \
+		agbe-convert:latest
 
 # Corpus harvesting is network-bound and runs unconstrained. It writes
 # corpus/manifest.json, which pins provenance, licence and SHA-256 for every
@@ -169,6 +187,35 @@ shell:
 # from different machines stay comparable.
 bench:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.run
+
+# Sustained-load thermal behaviour. Twenty minutes of continuous generation -
+# a load heavier than advisory use ever produces - to test for the one symptom
+# of throttling that is visible without a thermometer: throughput decay.
+#
+# Reports peak core temperature as null on hosts that do not expose sensors,
+# which the official profiler's schema explicitly permits, rather than
+# substituting a comforting number. See bench/thermal.py on why a temperature
+# from a development machine would not transfer to the target laptop anyway.
+thermal:
+	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.thermal $(ARGS)
+
+# Gate 1 screenshots, captured by driving the real UI in a real browser.
+#
+# The browser lives in a throwaway image (docker/Dockerfile.shots), never the
+# runtime. Both containers join a private network so Playwright can reach the
+# server by name without publishing a port on the host.
+#
+# The server is started detached and torn down in all cases, including failure,
+# so a crashed capture cannot leave a container holding port 8000.
+screenshots:
+	docker build -f docker/Dockerfile.shots -t agbe-shots:latest .
+	docker network create agbe-shots-net 2>/dev/null || true
+	MSYS_NO_PATHCONV=1 docker run -d --rm --name agbe-ui \
+		--network agbe-shots-net $(CONSTRAIN) $(MOUNTS) $(IMAGE)
+	-MSYS_NO_PATHCONV=1 docker run --rm --network agbe-shots-net \
+		-v "$(CURDIR)/docs/assets:/out" agbe-shots:latest --url http://agbe-ui:8000
+	-docker stop agbe-ui
+	-docker network rm agbe-shots-net
 
 # Answers "is the corpus enough?" with a measurement rather than an opinion.
 # Reports retrieval coverage on in-scope questions AND refusal accuracy on

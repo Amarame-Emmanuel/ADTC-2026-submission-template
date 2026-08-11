@@ -1,4 +1,37 @@
-"""Yoruba <-> English translation bridge (NLLB-200 distilled, int8, CTranslate2).
+"""NLLB-200 translation bridge - BUILT, MEASURED, AND NOT SHIPPED.
+
+STATUS: no code path imports this module. Read the next section before the
+rest, which was written while this was still the intended design.
+
+WHY IT IS NOT SHIPPED
+---------------------
+The bridge was converted to CTranslate2 int8 (621 MB on disk, ~740 MB resident,
+measured) and tested against the problem it existed to solve: questions asked in
+Nigerian Pidgin retrieving poorly from an English corpus.
+
+It solved none of it. On five Pidgin farm questions, raw retrieval found 1 and
+retrieval through NLLB also found 1 - zero improvement for ~740 MB, about 1.7
+points of S_eff.
+
+The wiring was correct: an eng->fra control through the same code returned "Mes
+feuilles de manioc sont jaunes et tortueuses". The cause is structural. Nigerian
+Pidgin is an English-lexified creole, so `pcm_Latn` receives input that looks
+like English and copies it through unchanged - which it did for three of the
+five questions.
+
+One output was actively dangerous. "My fowl dem dey die, dem neck dey twist" -
+Newcastle disease in a flock - became "My fowl will die, my neck will twist",
+turning a poultry question into a human medical symptom the scope guard is built
+to refuse.
+
+`agbe/translate/pidgin_norm.py` ships instead: a lookup table over the closed set
+of Pidgin markers, which costs no memory and raised the same measure from 1/5 to
+4/5.
+
+This file is kept as the record of a negative result, not as dead code awaiting
+revival. It would still be the right approach for Yoruba, Hausa or Igbo - real
+languages rather than English-lexified creoles - and the reasoning below applies
+unchanged if that work is ever done.
 
 WHY A BRIDGE INSTEAD OF A MULTILINGUAL MODEL
 --------------------------------------------

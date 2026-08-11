@@ -49,6 +49,8 @@ from agbe.translate.messages import get as get_messages
 from agbe.rag.compress import compress_hits
 from agbe.rag.embedder import Embedder
 from agbe.rag.index import SearchHit, VectorIndex
+from agbe.rag.query import retrieval_query
+from agbe.translate.pidgin_norm import for_retrieval as pidgin_for_retrieval
 from agbe.rag.safety import (
     SafetyVerdict,
     check_answer,
@@ -210,20 +212,13 @@ class AdvisoryEngine:
 
     # -- retrieval ---------------------------------------------------------
 
-    def retrieve(self, question: str, top_k: int | None = None) -> list[SearchHit]:
-        """Hybrid dense + lexical retrieval.
-
-        Dense-only retrieval failed on a farmer describing textbook Newcastle
-        disease symptoms, returning generic husbandry pages because the query's
-        dominant noun was "chickens". See agbe/rag/lexical.py.
-        """
-        return self.index.hybrid_search(
-            question,
-            self.embedder.embed_query(question),
-            top_k=top_k or config.RETRIEVAL.top_k,
-            min_score=config.RETRIEVAL.min_score,
-        )
-
+    # A bare `retrieve()` used to live here. It was removed WITH ITS CALLERS
+    # GONE rather than kept for symmetry: it skipped Pidgin normalisation and
+    # instruction stripping, so any future caller reaching for the
+    # shorter-named method would silently reopen the §6.3 retrieval bug from
+    # the surface they called it on. That is not hypothetical - it is exactly
+    # how the web server shipped without those fixes. retrieve_and_compress()
+    # is the only retrieval entry point.
     def retrieve_and_compress(
         self, question: str, top_k: int | None = None
     ) -> tuple[list[SearchHit], list[str], dict]:
@@ -233,10 +228,24 @@ class AdvisoryEngine:
         tokens are right for *finding* a passage and wasteful for *reading* it:
         the tokens that do not bear on the question still cost prefill time,
         which is the dominant term in time to first token.
+
+        Both retrieval and compression search with the *description* the farmer
+        gave, not the instructions attached to it - see agbe/rag/query.py for
+        the measurement that forced this. Compression needs it just as much as
+        retrieval: it scores individual sentences against the query vector, so
+        a vector pulled toward "practical steps for smallholders" keeps the
+        development-programme sentences and drops the symptom that identifies
+        the disease.
         """
-        query_vector = self.embedder.embed_query(question)
+        # Pidgin first, then instruction stripping: normalisation turns the
+        # question into English-ish text, which is what the instruction
+        # patterns in query.py are written against. English questions pass
+        # through pidgin_norm byte-identically, so the benchmarked English
+        # path is unchanged.
+        search_text = retrieval_query(pidgin_for_retrieval(question))
+        query_vector = self.embedder.embed_query(search_text)
         hits = self.index.hybrid_search(
-            question,
+            search_text,
             query_vector,
             top_k=top_k or config.RETRIEVAL.top_k,
             min_score=config.RETRIEVAL.min_score,
@@ -252,35 +261,72 @@ class AdvisoryEngine:
 
     # -- generation --------------------------------------------------------
 
-    def stream(self, question: str, top_k: int | None = None) -> Iterator[str]:
-        """Stream an answer, guarding numeric spans against invented dosages."""
-        hits = self.retrieve(question, top_k=top_k)
-        if not hits:
-            yield NO_GUIDANCE_MESSAGE
-            return
+    def guarded_stream(
+        self,
+        question: str,
+        hits: list[SearchHit],
+        texts: list[str],
+    ) -> Iterator[tuple[str, "GenerationStats | None"]]:
+        """The one dosage-guarded generation loop. Every streaming consumer
+        MUST go through here.
 
+        This method exists because the guard loop kept being reimplemented -
+        first in `stream()`, then again in the web server's `/ask` - and the
+        copies drifted every time the original was fixed. By the fourth
+        occurrence the server copy had missed the compression fix (still
+        sending ~2,100-token prompts at 65s TTFT), missed the query-preparation
+        fix (a judge pasting the submitted test prompt into the browser hit the
+        bug the fix was for), and had even grown its own sentence-boundary
+        detection that disagreed with `_SENTENCE_END`.
+
+        Retrieval is the caller's job, because callers legitimately differ
+        there: the server wants the hits early to emit a sources event before
+        the first token; `stream()` does not. Generation and guarding are NOT
+        allowed to differ, so they live here and only here.
+
+        Yields `(piece, stats)`; stats belong to `llm.stream` and are complete
+        only after the iterator is exhausted, so consumers wanting final stats
+        keep the last non-None value.
+
+        Containment is checked against the FULL chunk text, not the compressed
+        excerpt. Compression drops sentences; a number that is genuinely in the
+        source must not be flagged as invented merely because the sentence
+        carrying it was cut for length.
+        """
         source_texts = [h.chunk.text for h in hits]
         normalised_sources = _normalise_for_containment("\n".join(source_texts))
 
         buffer = ""
         guarding = False
+        last_stats = None
 
-        for piece, _stats in self.llm.stream(build_prompt(question, hits)):
+        for piece, stats in self.llm.stream(build_prompt(question, hits, texts)):
+            last_stats = stats
             if not guarding and any(ch.isdigit() for ch in piece):
                 guarding = True
 
             if not guarding:
-                yield piece
+                yield piece, stats
                 continue
 
             buffer += piece
             if _SENTENCE_END.search(buffer):
-                yield self._release(buffer, normalised_sources)
+                yield self._release(buffer, normalised_sources), stats
                 buffer = ""
                 guarding = False
 
         if buffer:
-            yield self._release(buffer, normalised_sources)
+            yield self._release(buffer, normalised_sources), last_stats
+
+    def stream(self, question: str, top_k: int | None = None) -> Iterator[str]:
+        """Stream an answer: retrieve, compress, then the shared guarded loop."""
+        hits, texts, _comp = self.retrieve_and_compress(question, top_k=top_k)
+        if not hits:
+            yield NO_GUIDANCE_MESSAGE
+            return
+
+        for piece, _stats in self.guarded_stream(question, hits, texts):
+            yield piece
 
     @staticmethod
     def _release(span: str, normalised_sources: str) -> str:

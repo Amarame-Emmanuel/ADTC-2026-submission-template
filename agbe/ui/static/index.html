@@ -126,6 +126,10 @@
     display: none;
   }
   #stats.on { display: block; }
+  #lang {
+    color: var(--muted); font-size: 0.75rem; margin-top: 0.5rem; display: none;
+  }
+  #lang.on { display: block; }
 
   footer {
     margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
@@ -137,14 +141,19 @@
 
 <header>
   <h1>Àgbẹ̀</h1>
-  <div class="tagline">Crop advice for cassava, maize, yam and tomato — grounded in agricultural extension documents.</div>
+  <div class="tagline">Crop, livestock, weather and market advice — grounded in agricultural extension documents, in English or Nigerian Pidgin.</div>
   <span class="offline-badge">RUNS OFFLINE · NO CLOUD</span>
 </header>
 
+<!-- Examples span the advisory areas rather than only crop disease, because
+     these buttons are what a first-time visitor reads as the scope of the
+     system. The tagline above claimed four crops long after the corpus and
+     evaluation set covered nine plus livestock. -->
 <div class="examples" id="examples">
   <button type="button">My cassava leaves are yellow and twisted</button>
-  <button type="button">Worms are eating inside my maize funnel</button>
-  <button type="button">My tomato plants wilt but stay green</button>
+  <button type="button">My chickens have twisted necks and greenish diarrhoea</button>
+  <button type="button">When should I plant maize in southwest Nigeria?</button>
+  <button type="button">Should I sell my yam now or store it?</button>
 </div>
 
 <form id="form">
@@ -153,6 +162,7 @@
 </form>
 
 <div id="stage"><span class="dot"></span><span id="stage-text"></span></div>
+<div id="lang"></div>
 
 <div id="sources" hidden>
   <div class="label">Sources used</div>
@@ -203,6 +213,7 @@
     noticeSlot.innerHTML = "";
     stats.classList.remove("on");
     stats.textContent = "";
+    document.getElementById("lang").classList.remove("on");
   }
 
   // The response is an SSE stream delivered over POST, so EventSource (which
@@ -220,7 +231,11 @@
       const res = await fetch("/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: question, language: "en" }),
+        // "auto": let the server detect the language. This was hardcoded to
+        // "en", which silently disabled Pidgin detection for every browser
+        // user - the server supported it, the tests exercised it, and the
+        // interface opted out of it.
+        body: JSON.stringify({ text: question, language: "auto" }),
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
 
@@ -258,7 +273,21 @@
   }
 
   function handle(event, data, cursor) {
-    if (event === "stage") {
+    if (event === "language") {
+      // Only shown when the server heard something other than English.
+      // Honesty matters here: for a detected-but-unvalidated language the
+      // server still answers in English, so the badge says "detected", not
+      // "answering in".
+      const names = { pcm: "Nigerian Pidgin", yor: "Yoruba", ibo: "Igbo" };
+      const lang = document.getElementById("lang");
+      if (names[data.language]) {
+        lang.textContent = "Language detected: " + names[data.language];
+        lang.classList.add("on");
+      } else {
+        lang.classList.remove("on");
+      }
+
+    } else if (event === "stage") {
       setStage(data.stage === "retrieving"
         ? "Searching the documents…"
         : "Writing the answer…");

@@ -1,0 +1,30 @@
+# Throwaway image for capturing UI screenshots. NEVER part of the runtime.
+#
+# Same principle as Dockerfile.convert: a browser is a build-time tool here,
+# like a compiler. The shipped image contains no browser, no Playwright, and
+# the memory budget in REPORT.md continues to describe what actually runs.
+#
+# Base is python:3.12-slim from Docker Hub rather than the official Playwright
+# image from mcr.microsoft.com. The Playwright image is the convenient choice
+# and it cost us an afternoon: its 619 MB base layer pulled at ~7 MB/min from
+# MCR on this connection and then failed at the containerd commit, twice.
+# Docker Hub layers have pulled at full line speed all day. `playwright
+# install --with-deps` fetches Chromium from Playwright's own CDN, which is
+# also fast. Convenience images are only convenient when their registry is.
+#
+# Screenshots are a Gate 1 deliverable, and the honest way to produce them is
+# to drive the real interface against the real engine and photograph whatever
+# it does. Mocking a convincing answer into the HTML would be faster and would
+# be a fabricated record of a system behaving well.
+# -bookworm pinned: bare python:3.12-slim moved to Debian 13 (trixie), which
+# playwright 1.47's dependency installer does not know. Diagnosed after the
+# unpinned build failed; not yet re-run - screenshots were captured manually
+# instead (docs/SCREENSHOTS.md).
+FROM python:3.12-slim-bookworm
+
+WORKDIR /shots
+RUN pip install --no-cache-dir playwright==1.47.0 \
+    && playwright install --with-deps chromium
+
+COPY scripts/screenshots.py /shots/screenshots.py
+ENTRYPOINT ["python", "/shots/screenshots.py"]

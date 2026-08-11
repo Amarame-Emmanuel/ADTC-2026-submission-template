@@ -9,11 +9,13 @@ farmers on an 8 GB laptop.
 > hoped for.
 >
 > Where a measurement contradicted a design estimate, the measurement is
-> reported and the estimate corrected — including three cases where it
+> reported and the estimate corrected — including four cases where it
 > overturned a decision we had already made: a larger model turned out to buy no
 > accuracy (§3.3), a coverage figure of 88% turned out to be 80% once relevance
-> was actually checked (§6.1), and a benchmark harness turned out to be 30×
-> pessimistic because of how the container was configured (§6.3).
+> was actually checked (§6.1), a benchmark harness turned out to be 30×
+> pessimistic because of how the container was configured (§6.5), and our own
+> submitted test prompt turned out to retrieve the wrong documents entirely
+> while the benchmark reported 100% (§6.3).
 >
 > Known limitations are in §7, including things a reader might otherwise assume
 > work.
@@ -146,11 +148,50 @@ contains it.
 The shipped non-English language is **Nigerian Pidgin (`pcm`)**, and it is
 delivered without a translation model at all.
 
-**What was planned and abandoned.** The original design was a bridge:
-NLLB-200-distilled-600M at int8, translating in and out around an
-English-reasoning core. That design is still the right one for free-form text,
-and the code for it exists (`agbe/translate/nllb.py`) — but it was never
-converted or shipped, and this report does not claim it.
+**What was planned, built, measured and rejected.** The original design was a
+bridge: NLLB-200-distilled-600M at int8, translating in and out around an
+English-reasoning core. We converted it (621 MB on disk, **~740 MB resident**,
+measured), wired it and tested it against the thing it was supposed to fix —
+Pidgin questions retrieving poorly. It does not fix it:
+
+| Pidgin question | raw | via NLLB | via normalisation |
+|---|---|---|---|
+| fowl dying, necks twisting | miss | miss | miss |
+| cassava leaf yellow and twisting | miss | miss | **hit** |
+| goat not eating, shaking | miss | miss | **hit** |
+| when to plant maize | hit | hit | hit |
+| stopping yam rotting in store | miss | miss | **hit** |
+| | **1/5** | **1/5** | **4/5** |
+
+**Zero improvement for ~740 MB.** The wiring was not at fault — an `eng→fra`
+control through the identical code path returned *"Mes feuilles de manioc sont
+jaunes et tortueuses"*, which is correct. The cause is structural: Nigerian
+Pidgin is an **English-lexified creole**, so NLLB's `pcm_Latn` sees input that
+looks like English and copies it through untouched. It did exactly that for
+three of the five questions.
+
+One case was worse than useless. *"My fowl dem dey die, dem neck dey twist"* — a
+textbook description of Newcastle disease in a flock — came back as *"My fowl
+**will** die, **my** neck will twist."* Present became future, and *their* necks
+became *my* neck, converting a poultry question into a human medical symptom
+that the scope guard exists to refuse. A layer that can turn a livestock
+question into a medical one is a safety regression, not a feature.
+
+**What ships instead of the bridge.** The same property that defeats NLLB makes
+the problem easy. Because Pidgin is English-lexified, its distance from English
+is concentrated in a small closed set of grammatical markers and everyday words
+— `dey`, `wetin`, `dem`, `go`, `chop`, `am`, `sabi`. `agbe/translate/pidgin_norm.py`
+maps those before retrieval. It costs **no memory, no framework and no load
+time**, it is auditable line by line by the same speaker who validated the
+safety messages, and it more than doubles Pidgin retrieval (1/5 → 4/5).
+
+English questions pass through it byte-identically, which is asserted by test
+rather than assumed — every benchmark number in this report was measured on
+English, and normalisation must not move them.
+
+`agbe/translate/nllb.py` remains in the tree, unused by any code path. It is
+kept as the record of a measured negative result; it is **not** shipped, not
+loaded, and not claimed.
 
 **What ships instead.** Every fixed message the farmer can receive — refusals,
 banned-pesticide warnings, dosage refusals, the veterinary withdrawal-period
@@ -183,10 +224,25 @@ deliberately biased towards English, because misrouting Pidgin to English costs
 a slightly stiff answer the farmer can still read, while the reverse is odd for
 no benefit.
 
-**The limit, stated here and not only in §7:** this covers messages the system
-*emits*. A question *asked* in Pidgin still goes to an English-only embedder and
-retrieves poorly. Pidgin speakers get correct refusals and safety warnings in
-their language; they do not reliably get answers.
+**Yoruba and Igbo: machinery ready, claim withheld.** Detection for both now
+ships (script characters first — ṣ is Yoruba-only, ụ ị ṅ Igbo-only, NFC-
+normalised so phone keyboards' combining marks behave; word evidence when
+diacritics are omitted), and the review tooling generalises the Pidgin flow:
+`scripts/lang_sheet.py --init yor` builds a validation sheet of every fixed
+safety string, sourced from `messages.py` so English is never retyped. The
+draft column is deliberately empty — NLLB drafts were measured deleting the
+prohibition clause from "It is banned" in Yoruba, and a wrong draft anchors a
+reviewer worse than no draft. Until a native speaker validates a sheet, the
+pinned contract is that detection changes nothing: `messages.get("yor")`
+serves English. Detecting a language is not claiming to support it.
+
+**The limit, stated here and not only in §7:** normalisation raised Pidgin
+retrieval from 1/5 to 4/5 on our sample, which is a real improvement and still
+below the English path. The remaining miss is the Newcastle disease question —
+the same case that has regressed under every retrieval change in this project
+(§7.9). Five questions is also a small sample: it is enough to reject NLLB,
+which scored no better than doing nothing, and not enough to put a percentage
+on Pidgin accuracy. We do not quote one.
 
 ### 3.3 We had headroom, measured what it would buy, and moved *down*
 
@@ -206,6 +262,12 @@ accuracy score — plus peak RSS, throughput and time to first token:
 | Throughput | **38.1 tok/s** | 20.9 tok/s |
 | Time to first token (p50) | **19.8 s** | 38.2 s |
 | `S_eff` = 100 × (7 − RSS) / 7 | **83.0** | 69.7 |
+
+*Both columns were measured on the pre-compression benchmark harness (§6.0), so
+the absolute RSS and TTFT here differ from the shipped figures. They are left as
+measured because this is an A/B: both models ran identical code, and correcting
+one column without re-running the 3B would turn a like-for-like comparison into
+a mismatched one. The ratios, which are what the decision rested on, stand.*
 
 **The 3B has no accuracy advantage.** Identical `acc`, and *lower* `acc_norm`.
 
@@ -393,21 +455,53 @@ an earlier estimate, the measurement is reported and the estimate corrected.
 
 | Metric | Measured | Ceiling / target |
 |---|---|---|
-| Peak RSS, full application | **1.51 GB** | 7 GB — **PASS** |
+| Peak RSS, full application | **1.73 GB** | 7 GB — **PASS** |
 | Peak RSS, bare model | **1.19 GB** | → `S_eff` **83.0** |
-| Throughput | **38.1 tok/s** | 15 tok/s reference — **capped at 100** |
-| Time to first token (p50) | **19.8 s** | — |
+| Throughput | **40.0 tok/s** | 15 tok/s reference — **capped at 100** |
+| Time to first token (p50 / p95) | **22.1 s / 26.6 s** | — |
+| Prompt size sent to the model | ~802 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
 | ARC-Easy `acc` / `acc_norm` (50 samples) | **0.740 / 0.780** | — |
-| Retrieval coverage (dev, relevance-checked) | **80.0%** | 80% — **PASS** |
-| Refusal accuracy (dev) | **100%** | 80% — **PASS** |
-| Retrieval latency p50 / p95 | 68 ms / 76 ms | — |
-| Index build, 7,986 chunks | 71 min, peak 0.18 GB | one-off |
+| Retrieval coverage (**held-out test**, relevance-checked) | **100%** (31/31) | 80% — **PASS** |
+| Refusal accuracy (**held-out test**) | **100%** (6/6) | 80% — **PASS** |
+| Retrieval latency p50 / p95 | 76 ms / 89 ms | — |
+| Index build, 31,682 chunks | one-off, peak 0.18 GB | one-off |
+| Sustained-load throughput decay (20 min continuous) | **1.0%** | <10% — no throttling signature (§6.7) |
+| Peak core temperature | null — host exposes no sensor (§6.7) | 85 °C penalty threshold |
 | **Offline operation** | **verified, `--network none`** | — |
 
-Predicted peak was 3.26 GB; measured 1.51 GB. The estimate was conservative in
+Predicted peak was 3.26 GB; measured 1.73 GB. The estimate was conservative in
 the right direction, largely because it budgeted for a 3B model and a resident
 translation model, neither of which the final design uses.
+
+**The performance figures moved late, and the reason is worth stating.** An
+earlier run of this table reported TTFT of 65 s. The cause was not the model:
+`bench/run.py` called `engine.retrieve()` and sent full chunk text, while the
+shipped `advise()` sent *compressed* passages. The benchmark was timing a
+configuration no user could reach — ~2,100 prompt tokens against the ~800 the
+application actually sends.
+
+`stream()` had the same defect — and so, we found in a later bug hunt, did the
+web server's `/ask`, which turned out not to call `stream()` at all but to carry
+its own copy-pasted generation loop. The guard logic existed in **three**
+places, and each fix reached some of them: the compression fix landed in
+`stream()` and the benchmark but not the browser, so the interface a judge
+actually touches kept sending ~2,100-token prompts at 65 s TTFT after this
+report first said the problem was fixed. The browser was also excluded from the
+query-preparation fix of §6.3 — pasting the submitted test prompt into the UI
+still reproduced the bug — and had quietly hardcoded `language: "en"`,
+disabling Pidgin detection that the server supported and the tests exercised.
+
+The structural fix, not the instance fix: generation and dosage-guarding now
+live in exactly one method, `AdvisoryEngine.guarded_stream()`, and `stream()`,
+`/ask` and the benchmark are all consumers of the same entry points. TTFT fell
+from 65 s to 22 s and wall clock for six questions halved. This defect class —
+a second code path that looks equivalent, is not, and is the one a judge will
+exercise — has now appeared four times in this project (the others: the web UI
+skipping scope guards, and `models.lock.json` pinning a different model from
+the one the app loaded). Each instance was found by running the artefact a
+reviewer would run, which is why §8 insists the reproduction commands are the
+ones we ourselves use.
 
 ### 6.1 What "coverage" means here, and what it used to mean
 
@@ -452,7 +546,85 @@ the animal.
 `make bench` records peak RSS, TTFT and tokens/sec labelled with host CPU and
 RAM. `make coverage` reports coverage and refusal accuracy.
 
-### 6.1 How memory is measured
+### 6.3 Our own test prompt broke the system, and a 100% benchmark did not notice
+
+The two prompts in `submission/metadata.json` are what a judge will run first.
+Late in development we ran them, and the first one failed badly.
+
+**Prompt:** *"A smallholder farmer in Oyo State, Nigeria says: my cassava leaves
+are yellow and twisted, and the plants are small. Explain the most likely cause,
+and give practical steps the farmer can take this week…"*
+
+**What Àgbẹ̀ answered:** the most likely cause is *"delayed harvesting due to
+lack of a ready market or storage"*, with the advice to *"harvest the cassava as
+soon as the leaves turn yellow."*
+
+Those symptoms are textbook cassava mosaic disease. The advice would cost a
+farmer the crop, and one cited source was *"Gender Gaps in Food Crop Production…
+Cameroon."*
+
+Three hypotheses were wrong before measurement found the cause:
+
+| Hypothesis | Measurement | Verdict |
+|---|---|---|
+| The 1.5B model is too small | bare model answered *better* than Àgbẹ̀ | wrong |
+| Institutional prose is out-scoring guidance | institutional-term density **0** in all six chunks | wrong |
+| The corpus lacks the content | corpus holds **155** cassava-mosaic passages | wrong |
+
+Printing the retrieved chunks showed what was actually being sent to the model:
+
+| # | Document | What the passage actually was |
+|---|---|---|
+| 1 | *Pest control in cassava farms* | the **title page** — "© IITA 2000 ISBN 978-", publisher address |
+| 2 | *Common African pests and diseases* | **garbled OCR** — "I esion a nd spiral nemalod es are o f importan ce" |
+| 5 | a post-harvest-loss project report | *"Major causes of PHL in cassava include delayed harvesting due to lac…"* |
+
+The model had not hallucinated. It was handed that fifth passage and used it
+faithfully. **The generator was innocent; retrieval was the defect.**
+
+The root cause was the query itself. Embedding the prompt against the corpus:
+
+| What was embedded | Top-ranked document | Score |
+|---|---|---|
+| the full prompt | climate value-chain adaptation reports | **0.775** |
+| the symptoms alone | *Disease control in cassava farms: IPM field guide* | 0.714 |
+
+*"Smallholder farmer"*, *"Oyo State, Nigeria"*, *"practical steps"*, *"cultural
+and preventive measures"* is the vocabulary of development-agency reporting — so
+it retrieved development-agency reports. Those phrases are most of the prompt;
+the four words carrying the diagnosis, *"yellow and twisted"*, were outvoted.
+
+A prompt contains two different things, and we had been conflating them:
+
+* a **description** of a situation → this is what the index should be searched with;
+* **instructions** to the answerer about tone, format and constraints → these
+  belong to the generator and say nothing about which passage is relevant.
+
+`agbe/rag/query.py` now separates them. `agbe/rag/quality.py` additionally
+rejects front matter and OCR debris at retrieval time (**5.3%** of the 31,682
+chunks: 1,395 garbled, 286 front matter). After both:
+
+| | Before | After |
+|---|---|---|
+| Top retrieved documents | climate/gender project reports | *Cassava (Bemisia tabaci)*, *Cassava Leaves*, *Growing cassava*, *Disease control in cassava* |
+| Diagnosis | "delayed harvesting due to lack of a ready market" | a cassava virus disease, with clean-planting-material control advice |
+| Held-out coverage | 100% | **100%** (unchanged) |
+| Held-out refusal | 100% | **100%** (unchanged) |
+
+**The uncomfortable part is the last two rows.** The held-out benchmark scored
+100% before this bug and 100% after it. It never saw the failure, because every
+evaluation question is phrased the way we phrase questions — short and direct —
+while our own submitted prompt is long and framed, the way a *judge* would write
+one. The benchmark was measuring a narrower thing than we believed it measured.
+
+We are reporting this rather than quietly shipping the fix, because it is the
+most useful thing we learned: **a passing metric is evidence about the metric
+before it is evidence about the system.** The regression is pinned by
+`tests/test_query.py` and `tests/test_quality.py`, and the honest residual
+limitation is recorded in §7 — our evaluation set still under-represents long,
+framed questions.
+
+### 6.4 How memory is measured
 
 Peak RSS is read from `/proc/self/status` **`VmHWM`**, the kernel's high-water
 mark — *not* psutil's instantaneous RSS, which will happily report 2 GB for a
@@ -464,7 +636,7 @@ disabled deliberately: with swap enabled the kernel pages instead of OOM-killing
 letting a run quietly exceed the ceiling and still appear to pass. **A breach
 must be a hard failure, not a number in a report.**
 
-### 6.2 A 30× measurement error, and why it matters
+### 6.5 A 30× measurement error, and why it matters
 
 The most consequential defect found during development was not in the model or
 the corpus. It was in how the container was constrained.
@@ -508,7 +680,7 @@ exactly the way the system under test can be wrong.
 `--cpuset-cpus` is also the more faithful emulation: a quota can burst above its
 average, a restricted CPU set cannot.
 
-### 6.3 Hardware honesty
+### 6.6 Hardware honesty
 
 Development hardware for this submission is an **i7-14650HX, 16C/24T, 16 GB
 DDR5-5600** — roughly 2–4× the memory bandwidth of the 8 GB DDR4 target, and
@@ -525,6 +697,46 @@ numbers. Every results row records its host.
 
 ⏳ **Outstanding:** a run on real 8 GB reference-class hardware. Until then, the
 throughput figures carry the caveat above.
+
+### 6.7 Thermal: what was measured, what could not be, and which is which
+
+`P_thermal` penalises a peak core temperature at or above **85 °C** (the
+threshold in the official profiler's `thermal.py`, whose schema also permits
+`core_temp_c_peak: null` on hosts that cannot report one).
+
+**This host cannot report one, and we verified that rather than assumed it:**
+the container's `/sys/class/thermal` holds cooling devices but no
+`thermal_zone*`; `/sys/class/hwmon` exposes only the AC adapter and battery;
+`psutil.sensors_temperatures()` returns `{}`; and the Windows-side WMI thermal
+class is access-denied. `bench/thermal.py` attempts the same sensor paths the
+official profiler uses and reports **null**, not a substitute.
+
+A temperature from this machine would also be the one benchmark number that is
+*worse* than nothing. Peak RSS transfers between machines — 1.7 GB here is
+1.7 GB anywhere. Temperature does not, even directionally: this host is a
+55 W-class i7-14650HX with the cooling of a workstation; the target is a
+15 W-class U-series i5 in a thin chassis. A comfortable reading here predicts
+nothing there.
+
+What *is* measurable without a thermometer is throttling's only symptom that
+matters to a farmer — the answer getting slower. `make thermal` generates
+continuously for 20 minutes, a duty cycle far above real request-driven use,
+and compares the last quarter's throughput against the first:
+
+| | Measured |
+|---|---|
+| Continuous generation | 20 min, 40 full answers |
+| Throughput, first quarter | 38.07 tok/s |
+| Throughput, last quarter | 37.68 tok/s |
+| **Decay** | **1.0%** (alert threshold 10%) |
+| Peak core temperature | null — sensors unavailable, stated above |
+
+Flat throughput under sustained worst-case load is positive evidence of no
+throttling on this host — held, incidentally, while an unrelated container
+image was building on the same machine. What transfers to the target laptop is
+not that verdict but the workload's shape: four pinned threads, bandwidth-bound
+generation, and a request-driven duty cycle in real use. The measurement on
+reference hardware remains outstanding, as §6.6 already states.
 
 ---
 
@@ -546,18 +758,23 @@ more than finding them hidden.
 4. **The corpus filter is hand-tuned.** Thresholds are judgement, not fitted
    values. See §4.5.
 5. **No translation model ships.** Yoruba, Hausa and Igbo are *not* supported.
-   The NLLB bridge in `agbe/translate/nllb.py` is written but was never
-   converted or wired, so no code path uses it. Nigerian Pidgin is delivered
-   through validated fixed strings instead (§3.2).
+   The NLLB bridge in `agbe/translate/nllb.py` was converted and measured, then
+   rejected: it improved Pidgin retrieval by nothing at all for ~740 MB, and
+   mistranslated one livestock question into a human medical one (§3.2). No
+   code path uses it. Nigerian Pidgin is delivered through validated fixed
+   strings plus zero-cost query normalisation instead.
 6. **No live data.** Weather, prices and current registrations are out of scope by
    design (§1).
-7. **Pidgin retrieval is English-only.** Fixed messages — refusals, safety
-   warnings, prohibitions — are human-validated Pidgin. But the embedder is
-   `bge-small-en`, so a question *asked* in Pidgin retrieves poorly and usually
-   refuses. Pidgin users currently get correct refusals and warnings, not
-   answers. Closing this needs either the NLLB bridge (~600 MB, ~1.7 points of
-   `S_eff`) or a Pidgin→English query normalisation pass. Stated plainly because
-   "supports Nigerian Pidgin" would otherwise overclaim.
+7. **Pidgin retrieval is weaker than English, and measured on five questions.**
+   Fixed messages are human-validated Pidgin, and query normalisation raised
+   retrieval from 1/5 to 4/5 (§3.2). But the embedder is still `bge-small-en`,
+   the corpus is entirely English, and **five questions is too small a sample to
+   quote an accuracy figure from** — it is sufficient to reject NLLB, which did
+   no better than nothing, and insufficient to characterise Pidgin performance.
+   Closing this properly needs a Pidgin evaluation set on the scale of the
+   English one (70 questions), which we have not built. "Supports Nigerian
+   Pidgin" means: validated safety messages, working detection, and materially
+   improved but unquantified retrieval.
 8. **The corpus filter is not evaluated in isolation** (§4.5).
 9. **One evaluation question regresses under threshold changes.** The Newcastle
    disease case has been fixed twice — by stemming, then by rank fusion — and
@@ -566,6 +783,16 @@ more than finding them hidden.
    threshold boundary. It is a useful canary and is kept in the evaluation set
    for that reason.
 10. **50 evaluation samples for ARC-Easy** carries ±6% uncertainty (§3.3).
+11. **The evaluation set under-represents long, framed questions.** Every one of
+    the 70 questions is short and direct, the way we write questions. Our own
+    submitted test prompt is long and framed, the way a *judge* writes one — and
+    it retrieved the wrong documents entirely while the benchmark reported 100%
+    coverage on both dev and test splits (§6.3). The retrieval defect is fixed
+    and pinned by tests; **the blind spot in the evaluation set is not.** A
+    proper fix means writing framed variants of existing questions and
+    re-measuring, which we have not done. Until then, the coverage figure should
+    be read as *coverage on directly-phrased questions*, which is a narrower
+    claim than it appears.
 
 ---
 
@@ -656,4 +883,4 @@ bonus it would earn.
 absence of PyTorch, validated strings instead of a resident translation model,
 the choice to move *down* in model size when measurement showed a larger model
 bought no accuracy, and exact search instead of an ANN index. Peak RSS is
-**1.51 GB against the 7 GB ceiling**. See §3.
+**1.73 GB against the 7 GB ceiling**. See §3.
