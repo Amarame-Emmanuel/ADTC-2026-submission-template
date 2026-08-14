@@ -40,7 +40,36 @@ CHARS_PER_TOKEN = 3.5
 #: Paragraph-ish split. PDF extraction rarely produces clean paragraphs, so we
 #: also treat bullet markers and numbered headings as boundaries - extension
 #: manuals are full of them and they are natural semantic breaks.
-_SPLIT = re.compile(r"\n\s*\n|\n(?=\s*(?:[-•*·]|\d+[.)]\s))")
+#:
+#: THE SINGLE-NEWLINE HEADING
+#: --------------------------
+#: This originally split only on blank lines and bullets, which meant a heading
+#: separated from its neighbours by a SINGLE newline was never isolated into
+#: its own paragraph - and `looks_like_heading` below, which would have
+#: recognised it, was never given the chance.
+#:
+#: PDF extraction produces exactly that shape. Measured in "Growing cassava:
+#: training manual for extension & farmers in Zambia":
+#:
+#:     ...the plants become stunted (Figure 6.5).\n
+#:     39\n
+#:     Cassava Brown Streak Disease (CBSD)\n
+#:     CBSD is a disease of cassava...
+#:
+#: The symptom text above that heading is the tail of the *Cassava Mosaic
+#: Disease* section, whose own heading stayed behind in the previous chunk. So
+#: the passage describing mosaic symptoms carried the name of a different
+#: disease - and it was the top-ranked passage for the submitted test prompt.
+#: The model read it faithfully and diagnosed brown streak for textbook mosaic
+#: symptoms. See docs/RETRIEVAL.md.
+#:
+#: A bare page number on its own line is consumed with the following break so
+#: it does not become a chunk of its own or pad the heading.
+_SPLIT = re.compile(
+    r"\n\s*\n"
+    r"|\n(?=\s*(?:[-•*·]|\d+[.)]\s))"
+    r"|\n(?:\s*\d{1,4}\s*\n)?(?=[A-Z][^\n]{2,70}\n)"
+)
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
@@ -187,7 +216,7 @@ def chunk_pages(
             )
         )
 
-    def flush(end_page: int) -> None:
+    def flush(end_page: int, carry_overlap: bool = True) -> None:
         nonlocal buf, buf_start_page
         text = buf.strip()
         if len(text) >= min_chars:
@@ -206,8 +235,22 @@ def chunk_pages(
                         emit(piece.strip(), end_page)
             else:
                 emit(text, end_page)
-        # Carry a tail forward as overlap for the next chunk.
-        buf = text[-overlap_chars:] if overlap_chars and len(text) > overlap_chars else ""
+        # Carry a tail forward as overlap for the next chunk - except across a
+        # section heading.
+        #
+        # Overlap exists so a passage split mid-section stays retrievable from
+        # either side. At a section boundary it does the opposite: it copies the
+        # previous section's text into a chunk headed by the next section's
+        # title, which is precisely the mislabelling this fix exists to remove.
+        #
+        # Measured: with the heading split working but overlap still carried,
+        # the mosaic symptom text was re-imported into the chunk headed
+        # "Cassava Brown Streak Disease (CBSD)" and the defect survived intact.
+        # A heading is exactly where the two sides should NOT bleed together.
+        if carry_overlap:
+            buf = text[-overlap_chars:] if overlap_chars and len(text) > overlap_chars else ""
+        else:
+            buf = ""
         buf_start_page = end_page
 
     for page_no, page_text in enumerate(pages, start=1):
@@ -226,12 +269,18 @@ def chunk_pages(
             # disease page became unretrievable by symptom. Only break when the
             # buffer is already substantial, so a run of short headings does
             # not shred the text.
-            if (
-                looks_like_heading(para)
-                and buf
-                and len(buf) > max_chars * 0.5
-            ):
-                flush(page_no)
+            # The half-full condition was a second reason the mosaic/brown-streak
+            # boundary survived: when the CBSD heading arrived the buffer held
+            # only ~230 characters of trailing mosaic text against a ~580
+            # threshold, so even a detected heading would not have broken there.
+            #
+            # A heading is a semantic boundary whatever the buffer contains. The
+            # guard it replaces existed to stop a run of short headings shredding
+            # the text, which `min_chars` already prevents - flush() drops
+            # anything below it - so the size test was doing no work that
+            # mattered and was suppressing the breaks that did.
+            if looks_like_heading(para) and len(buf.strip()) >= min_chars:
+                flush(page_no, carry_overlap=False)
 
             for piece in (
                 _split_long_paragraph(para, max_chars)
