@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T12:44:22+00:00",
+  "generated_at": "2026-08-14T13:01:21+00:00",
   "host": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
     "machine": "x86_64",
@@ -12,115 +12,115 @@
   },
   "reference_like_hardware": false,
   "models": {
-    "llm": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "llm": "qwen2.5-3b-instruct-q4_k_m.gguf",
     "embedding": "bge-small-en-v1.5-q8_0.gguf",
     "n_ctx": 4096,
     "n_threads": 4
   },
   "memory": {
-    "peak_rss_bytes": 1839570944,
-    "peak_rss_gb": 1.713,
+    "peak_rss_bytes": 2909163520,
+    "peak_rss_gb": 2.709,
     "ceiling_gb": 7.0,
     "internal_target_gb": 5.0,
     "under_ceiling": true,
     "under_internal_target": true,
-    "headroom_gb": 5.287,
+    "headroom_gb": 4.291,
     "stages_gb": {
       "baseline": 0.034,
       "after_index_load": 0.162,
       "after_embedder_load": 0.218,
-      "after_llm_load": 1.414,
-      "after_generation": 1.713
+      "after_llm_load": 2.366,
+      "after_generation": 2.709
     },
     "predicted_gb": 1.848
   },
   "latency": {
-    "ttft_p50_s": 17.94,
-    "ttft_p95_s": 20.18,
-    "ttft_mean_s": 17.803
+    "ttft_p50_s": 36.207,
+    "ttft_p95_s": 44.508,
+    "ttft_mean_s": 37.124
   },
   "throughput": {
-    "tokens_per_second_p50": 38.0,
-    "tokens_per_second_mean": 37.07,
+    "tokens_per_second_p50": 21.51,
+    "tokens_per_second_mean": 21.49,
     "mean_prompt_tokens": 773,
-    "mean_completion_tokens": 160
+    "mean_completion_tokens": 91
   },
   "workload": {
     "n_questions": 10,
     "n_answered": 10,
     "n_refused": 0,
-    "wall_clock_s": 245.1
+    "wall_clock_s": 437.1
   },
   "per_question": [
     {
       "question": "My cassava leaves are yellow and twisted and the plant is small. What is wrong?",
       "refused": false,
-      "ttft_s": 15.986,
-      "tokens_per_second": 37.77,
-      "completion_tokens": 98
+      "ttft_s": 32.109,
+      "tokens_per_second": 22.11,
+      "completion_tokens": 90
     },
     {
       "question": "How does cassava mosaic spread from one farm to another?",
       "refused": false,
-      "ttft_s": 14.594,
-      "tokens_per_second": 37.6,
-      "completion_tokens": 97
+      "ttft_s": 27.872,
+      "tokens_per_second": 21.31,
+      "completion_tokens": 60
     },
     {
       "question": "Where should I get cassava stems to plant so my crop does not get sick?",
       "refused": false,
-      "ttft_s": 19.06,
-      "tokens_per_second": 37.69,
-      "completion_tokens": 120
+      "ttft_s": 43.446,
+      "tokens_per_second": 21.51,
+      "completion_tokens": 92
     },
     {
       "question": "My cassava roots have brown rotten patches inside when I cut them",
       "refused": false,
-      "ttft_s": 17.851,
-      "tokens_per_second": 38.15,
-      "completion_tokens": 256
+      "ttft_s": 44.508,
+      "tokens_per_second": 21.44,
+      "completion_tokens": 150
     },
     {
       "question": "There are white cottony insects on the growing tip of my cassava",
       "refused": false,
-      "ttft_s": 16.012,
-      "tokens_per_second": 40.76,
-      "completion_tokens": 214
+      "ttft_s": 35.737,
+      "tokens_per_second": 21.55,
+      "completion_tokens": 107
     },
     {
       "question": "My cassava leaves have tiny yellow spots and look dusty underneath",
       "refused": false,
-      "ttft_s": 20.18,
-      "tokens_per_second": 30.17,
-      "completion_tokens": 256
+      "ttft_s": 36.207,
+      "tokens_per_second": 21.47,
+      "completion_tokens": 78
     },
     {
       "question": "Cassava leaves have angular brown spots and the stem is oozing",
       "refused": false,
-      "ttft_s": 17.475,
-      "tokens_per_second": 40.59,
-      "completion_tokens": 256
+      "ttft_s": 35.603,
+      "tokens_per_second": 22.4,
+      "completion_tokens": 167
     },
     {
       "question": "Should I remove the sick cassava plants from my field?",
       "refused": false,
-      "ttft_s": 17.94,
-      "tokens_per_second": 30.28,
-      "completion_tokens": 21
+      "ttft_s": 33.852,
+      "tokens_per_second": 19.93,
+      "completion_tokens": 34
     },
     {
       "question": "When should I weed my cassava farm?",
       "refused": false,
-      "ttft_s": 19.44,
-      "tokens_per_second": 38.0,
-      "completion_tokens": 111
+      "ttft_s": 41.249,
+      "tokens_per_second": 21.36,
+      "completion_tokens": 53
     },
     {
       "question": "How far apart should I plant cassava?",
       "refused": false,
-      "ttft_s": 19.494,
-      "tokens_per_second": 39.73,
-      "completion_tokens": 172
+      "ttft_s": 40.654,
+      "tokens_per_second": 21.85,
+      "completion_tokens": 75
     }
   ]
 }

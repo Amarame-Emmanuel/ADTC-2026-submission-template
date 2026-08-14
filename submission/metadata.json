@@ -15,7 +15,7 @@
   "cross_disciplinary_pairing": {
     "discipline": "information_retrieval",
     "load_bearing": true,
-    "description": "Retrieval over a vetted local corpus of 794 agricultural extension documents is what supplies the agronomy; the language model only reads and summarises it. Hybrid dense plus BM25 search with stemming was required after dense-only retrieval failed to surface a Newcastle disease page for a farmer describing its textbook symptoms, causing the model to invent a diagnosis. Retrieval provenance also carries the safety layer: publication year drives suppression of dated chemical guidance, and every claim is traceable to a cited page."
+    "description": "Retrieval over a local corpus of 995 agricultural extension documents (218 individually vetted through six provenance and content gates, the remainder from the Infonet-Biovision offline release), chunked into 29,959 searchable passages, is what supplies the agronomy; the language model only reads and summarises it. Hybrid dense plus BM25 search with stemming was required after dense-only retrieval failed to surface a Newcastle disease page for a farmer describing its textbook symptoms, causing the model to invent a diagnosis. Retrieval provenance also carries the safety layer: publication year drives suppression of dated chemical guidance, and every claim is traceable to a cited page."
   },
   "test_prompts": [
     {

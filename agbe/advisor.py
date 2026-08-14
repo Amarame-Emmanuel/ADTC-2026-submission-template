@@ -49,7 +49,7 @@ from agbe.translate.messages import get as get_messages
 from agbe.rag.compress import compress_hits
 from agbe.rag.embedder import Embedder
 from agbe.rag.index import SearchHit, VectorIndex
-from agbe.rag.query import retrieval_query
+from agbe.rag.query import retrieval_query, with_diagnostic_intent
 from agbe.translate.pidgin_norm import for_retrieval as pidgin_for_retrieval
 from agbe.rag.safety import (
     SafetyVerdict,
@@ -242,7 +242,9 @@ class AdvisoryEngine:
         # patterns in query.py are written against. English questions pass
         # through pidgin_norm byte-identically, so the benchmarked English
         # path is unchanged.
-        search_text = retrieval_query(pidgin_for_retrieval(question))
+        search_text = with_diagnostic_intent(
+            retrieval_query(pidgin_for_retrieval(question))
+        )
         query_vector = self.embedder.embed_query(search_text)
         hits = self.index.hybrid_search(
             search_text,

@@ -20,6 +20,13 @@ corpus/external/*
 # raw per-run traces are not.
 bench/traces/
 
+# Side-by-side workspace for evaluating a candidate model against the shipped
+# one. Everything here is a local experiment: candidate GGUFs and their bench,
+# ARC and llama-bench output. A candidate that wins is promoted deliberately -
+# its weights pinned in models.lock.json and its measurements committed to
+# bench/results/ - rather than arriving as a directory nobody reviewed.
+model2/
+
 # Python
 __pycache__/
 *.py[cod]

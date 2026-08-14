@@ -1,0 +1,7 @@
+{
+  "benchmark": "arc_easy",
+  "samples": 50,
+  "acc": 0.62,
+  "acc_norm": 0.62,
+  "model": "qwen2.5-0.5b-instruct-q4_k_m.gguf"
+}

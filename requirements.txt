@@ -2,37 +2,40 @@
 #
 # HARD RULE: PyTorch must never appear in this file, directly or transitively.
 # Torch costs ~700MB-1GB resident before any weights load, which is ~14% of the
-# 7GB ceiling spent on a framework we do not need. Every model in this system
+# 7GB ceiling spent on a framework we do not need. The only model in this system
 # runs on a C++ inference engine instead:
 #
 #   LLM + embeddings -> llama.cpp   (via llama-cpp-python)
-#   Yoruba<->English -> CTranslate2 (int8 NLLB)
-#   Leaf classifier  -> ONNX Runtime
 #
 # `make verify-no-torch` enforces this in CI and in the audit path.
+#
+# DELIBERATELY ABSENT: ctranslate2, sentencepiece and transformers. The NLLB
+# translation bridge in agbe/translate/nllb.py was converted, measured and
+# rejected (REPORT.md 3.2) - it bought nothing for ~740MB. The module is kept as
+# the record of a negative result, imports its dependencies function-locally, and
+# is reachable from no code path. Shipping its wheels in the runtime image would
+# contradict the claim that it is not shipped. Nigerian Pidgin is delivered by
+# validated fixed strings plus zero-cost query normalisation, which need nothing
+# here. Tokenisation is done by llama.cpp itself (agbe/llm.py: _llm.tokenize).
+#
+# ALSO ABSENT: onnxruntime and Pillow. They were pinned for a leaf-disease
+# classifier that was never built. See REPORT.md 3.1.
 
-# --- Inference engines -------------------------------------------------------
+# --- Inference engine --------------------------------------------------------
 llama-cpp-python==0.3.2
-ctranslate2==4.5.0
-onnxruntime==1.20.1
-
-# --- Tokenisation ------------------------------------------------------------
-# transformers is used ONLY for its tokenizer classes (pure-python + tokenizers
-# rust ext). Installing it must not drag in torch; verify-no-torch checks this.
-transformers==4.47.1
-sentencepiece==0.2.0
 
 # --- Service layer -----------------------------------------------------------
+# No python-multipart: /ask takes a JSON body via a pydantic model, not a form.
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
-python-multipart==0.0.20
 
 # --- Numerics / utilities ----------------------------------------------------
-# numpy pinned <2 because onnxruntime 1.20 and ctranslate2 4.5 wheels are built
-# against the 1.x ABI.
+# numpy is still pinned to 1.x. The original reason (onnxruntime and ctranslate2
+# built against the 1.x ABI) is gone with those packages, but llama-cpp-python
+# 0.3.2 has not been verified against numpy 2 on this image. Lifting the pin is a
+# separate change that needs a build and a bench run behind it, not a guess.
 numpy==1.26.4
-Pillow==11.0.0
 psutil==6.1.1
 huggingface-hub==0.27.0
 pypdf==5.1.0

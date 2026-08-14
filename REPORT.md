@@ -9,13 +9,16 @@ farmers on an 8 GB laptop.
 > hoped for.
 >
 > Where a measurement contradicted a design estimate, the measurement is
-> reported and the estimate corrected — including four cases where it
+> reported and the estimate corrected — including five cases where it
 > overturned a decision we had already made: a larger model turned out to buy no
 > accuracy (§3.3), a coverage figure of 88% turned out to be 80% once relevance
 > was actually checked (§6.1), a benchmark harness turned out to be 30×
-> pessimistic because of how the container was configured (§6.5), and our own
+> pessimistic because of how the container was configured (§6.5), our own
 > submitted test prompt turned out to retrieve the wrong documents entirely
-> while the benchmark reported 100% (§6.3).
+> while the benchmark reported 100% (§6.3), and — the one that most directly
+> concerns this document — the headline results table itself turned out to be
+> hand-maintained rather than artifact-backed, quoting three figures no
+> committed run contained (§6.0).
 >
 > Known limitations are in §7, including things a reader might otherwise assume
 > work.
@@ -34,8 +37,8 @@ inconvenience — an advisory service that fails during a harmattan power cut or
 when data credit runs out fails precisely when it is needed.
 
 Àgbẹ̀ removes all three from the critical path. Everything runs on-device: the
-language model, the retrieval index, the translation model, and the corpus of
-agricultural extension documents.
+language model, the retrieval index, and the corpus of agricultural extension
+documents.
 
 ### Who this is for
 
@@ -126,8 +129,13 @@ Every model in this system therefore runs on a C++ inference engine:
 |---|---|---|
 | Language model | llama.cpp | ~1.9 GB (Q4\_K\_M) |
 | **Embeddings** | **llama.cpp — same runtime** | **~50 MB** |
-| Translation | CTranslate2 (int8) | ~600 MB, lazy-loaded |
-| Vision classifier | ONNX Runtime | ~20 MB |
+
+That table is the whole inventory. Two components appeared in earlier drafts of
+it and ship in neither the image nor the code: a CTranslate2 translation model,
+measured and rejected in §3.2, and an ONNX leaf classifier, which was scoped and
+never built. Their wheels are no longer pinned in `requirements.txt` either — a
+dependency retained for a component that does not exist is an unbacked claim
+with an install cost attached.
 
 The embedding decision compounds the saving. The reflex choice,
 `sentence-transformers`, pulls PyTorch to serve a 33M-parameter encoder.
@@ -138,10 +146,14 @@ build, audit or ship.
 This is enforced, not merely intended: the Docker build **fails** if `torch` is
 importable, and `make verify-no-torch` checks the shipped image.
 
-**Torch still appears once — as a build dependency.** Converting NLLB to
-CTranslate2 requires it. That conversion runs in a separate throwaway image
-(`docker/Dockerfile.convert`), exactly like a compiler. The runtime image never
-contains it.
+**Torch appears nowhere in the shipped pipeline.** It was once a build
+dependency: converting NLLB to CTranslate2 requires it, in a separate throwaway
+image (`docker/Dockerfile.convert`), used exactly like a compiler. With the
+bridge rejected in §3.2, that conversion is no longer a step anyone needs to
+run, and `make convert-models` has been dropped from the reproduction sequence
+in §8. The target and its Dockerfile remain in the tree alongside
+`agbe/translate/nllb.py`, so the negative result stays reproducible by anyone
+who wants to check it rather than take our word for it.
 
 ### 3.2 Validated fixed messages instead of a translation model
 
@@ -246,7 +258,7 @@ on Pidgin accuracy. We do not quote one.
 
 ### 3.3 We had headroom, measured what it would buy, and moved *down*
 
-The obvious move with 4.5 GB of spare memory is a larger model. We measured
+The obvious move with 5.3 GB of spare memory is a larger model. We measured
 instead, and the measurement said the opposite.
 
 Both candidates were evaluated on **ARC-Easy, 50 samples** — the same benchmark
@@ -257,37 +269,121 @@ accuracy score — plus peak RSS, throughput and time to first token:
 |---|---|---|
 | ARC-Easy `acc` | **0.740** | 0.740 |
 | ARC-Easy `acc_norm` | **0.780** | 0.760 |
-| Peak RSS (bare model) | **1.19 GB** | 2.12 GB |
-| Peak RSS (full application) | **1.51 GB** | 2.53 GB |
-| Throughput | **38.1 tok/s** | 20.9 tok/s |
-| Time to first token (p50) | **19.8 s** | 38.2 s |
-| `S_eff` = 100 × (7 − RSS) / 7 | **83.0** | 69.7 |
+| Peak RSS (full application) | **1.71 GB** | 2.71 GB |
+| Throughput (p50) | **38.0 tok/s** | 21.5 tok/s |
+| Time to first token (p50 / p95) | **17.9 s / 20.2 s** | 36.2 s / 44.5 s |
+| Mean prompt tokens sent | 773 | 773 |
+| `S_eff` = 100 × (7 − RSS) / 7 | **75.5** | 61.3 |
 
-*Both columns were measured on the pre-compression benchmark harness (§6.0), so
-the absolute RSS and TTFT here differ from the shipped figures. They are left as
-measured because this is an A/B: both models ran identical code, and correcting
-one column without re-running the 3B would turn a like-for-like comparison into
-a mismatched one. The ratios, which are what the decision rested on, stand.*
+*This is a true like-for-like A/B, which it had not previously been. Both
+columns come from the same harness at the same commit, sending the same 773
+prompt tokens, under the same 4-core cpuset — `bench/results/benchmark.json` and
+`benchmark_3b.json`, both committed. Reproduce either with
+`AGBE_LLM_FILENAME=<gguf> make bench`.*
+
+*It is worth recording what the earlier, unbacked version of this table said,
+because the correction went the opposite way from the one you would expect a
+team to make about its own choice. It quoted the 3B at 2.53 GB, 20.9 tok/s and
+38.2 s TTFT, and the 1.5B at a bare-model 1.19 GB. Measured properly, the 3B is
+**2.71 GB** — worse than claimed — and the 1.5B is 1.71 GB on the same basis. The
+memory gap the decision turned on was therefore **understated**: 1.00 GB, not
+0.76 GB, and 14.2 points of `S_eff` rather than 10.7. Getting the number right
+strengthened the case for the model we had already picked, which is the least
+suspicious direction for an error to move but not a reason to have left it
+unmeasured.*
 
 **The 3B has no accuracy advantage.** Identical `acc`, and *lower* `acc_norm`.
 
-The decision rule was set before the measurement: the 3B costs 13.3 points of
-`S_eff`, which at a 20% weight is 2.66 points of final score, so it needed to
-win accuracy by **more than 5.3 points** to break even. It won by zero.
+The decision rule was set before the measurement: the 3B costs 14.2 points of
+`S_eff`, which at a 20% weight is 2.84 points of final score, so it needed to
+win accuracy by **more than 5.7 points** to break even. It won by zero.
+
+**The bracket was later closed from below.** The same rule was applied to
+Qwen2.5-**0.5B** (decision threshold set first: its ~+8 points of S_eff at 20%
+weight allow an accuracy loss under **3.4 points**). Measured, and committed as
+`bench/results/arc_0.5b.json`: ARC-Easy **0.620 `acc` / 0.620 `acc_norm`**
+against the 1.5B's 0.740 / 0.780 — a 12-point loss on `acc` and 16 on
+`acc_norm`, ≈ −4.3 final points net at best.
+The qualitative failure settles it more vividly than the arithmetic: handed
+the *same retrieved passages* the 1.5B reads correctly, the 0.5B answered the
+submitted cassava prompt with *"the most likely cause is a lack of
+chlorophyll"* (the symptom restated as its cause) and advised cutting off
+affected leaves and **replanting the healthy part** — for a virus spread
+through planting material, the exact practice the sources warn against.
+
+Below some capability floor a model cannot be trusted to read sources, which
+is the one job this system leaves to it. 0.5B is under that floor, 3B pays
+for nothing above it: **1.5B is the measured minimum, bounded on both sides.**
 
 Estimated final score under the published formula:
 
 | | 1.5B | 3B |
 |---|---|---|
 | 0.50 × S\_acc | 37.0 | 37.0 |
-| 0.30 × S\_perf | 30.0 | 30.0 |
-| 0.20 × S\_eff | **16.6** | 13.9 |
-| **S\_total** | **83.6** | 80.9 |
+| 0.30 × S\_perf | *see below* | *see below* |
+| 0.20 × S\_eff | **15.1** | 12.3 |
+| **S\_total**, excluding `S_perf` | **52.1** | 49.3 |
+
+**`S_perf` is deliberately left blank, and earlier drafts of this table were
+wrong to fill it in.** They booked 30.0 — a perfect score — for both models. The
+published formula is `S_perf = 100 × (TPS_act ÷ TPS_max)` where `TPS_max` is the
+highest throughput *across all submissions*. It is a rank, not a threshold:
+there is no reference figure to clear and no cap to reach. Booking 30.0 assumed
+we would be the fastest entrant, which is not a measurement we are able to make.
+
+What can be said is the sensitivity, and it is steep:
+
+| If the fastest submission runs at | our `S_perf` | 0.30 × `S_perf` |
+|---|---|---|
+| our own throughput | 100 | 30.0 |
+| 1.5× ours | 67 | 20.0 |
+| 2× ours | 50 | 15.0 |
+| 3× ours | 33 | 10.0 |
+
+The spread between the first and last row is 20 points of final score — larger
+than the entire `S_eff` term we spent §3 optimising. It is also the one term no
+amount of care on this machine can pin down, because the denominator belongs to
+other teams. The honest statement is that our controllable score is **52.1**
+plus whatever the field allows, and that `S_perf` deserves more engineering
+attention than its 30% weight suggests, precisely because it is the term we
+cannot measure.
+
+`S_eff` here is computed from **peak RSS of the full running application** —
+1.71 GB for the 1.5B, 2.71 GB for the 3B — because the published formula defines
+peak RAM as the maximum RSS measured *during the audit*, and what the audit runs
+is the application, not the model in isolation. An earlier version of this table
+used the bare-model figure of 1.19 GB instead, giving `S_eff` 83.0 and a total of
+83.6. That basis was 1.5 points of final score too generous, and it was our own
+number to get right: no judge would have caught it, and the first place it would
+have shown up is a measured score lower than the one we published.
 
 **Honest caveat:** 50 samples carries roughly ±6% uncertainty, so this does not
 establish that the 1.5B is *more* accurate. It establishes that the 3B failed to
 demonstrate the advantage it needed, and the tie-break goes to the model that is
 better on everything else.
+
+**How little a tie at this sample size is worth, measured rather than
+estimated.** While evaluating a candidate model we re-ran the *incumbent* on a
+newer llama.cpp as a control. Same weights, same 50 questions, same four pinned
+cores; only the inference engine changed:
+
+| Qwen2.5-1.5B Q4\_K\_M | `acc` | `acc_norm` |
+|---|---|---|
+| llama.cpp 0.3.2 (shipped) | 0.740 | 0.780 |
+| llama.cpp 0.3.16 | 0.720 | 0.740 |
+
+Two points of `acc` and four of `acc_norm` moved with **no change to the model at
+all**. That is the measurement apparatus wobbling, and it is the same order as
+the differences this section reports to three decimal places. So "identical
+`acc`, lower `acc_norm`" should be read as *the 3B showed no detectable
+advantage*, not as a precise tie — the harness cannot resolve differences this
+small, and we should not write as though it can.
+
+This does not disturb the decision. The 3B was rejected for costing 1.00 GB of
+peak RSS, a gap fourteen times larger than this noise band and one that
+transfers between machines. But it is a caution against building any future
+argument on a 2-point ARC difference, and it is why §7.10 lists the sample size
+as a known limitation rather than a footnote.
 
 The margin is probably understated. The profiler builds llama.cpp **scalar** —
 `GGML_AVX2=OFF`, `GGML_FMA=OFF`, `GGML_BLAS=OFF` — for cross-machine parity. Our
@@ -455,24 +551,66 @@ an earlier estimate, the measurement is reported and the estimate corrected.
 
 | Metric | Measured | Ceiling / target |
 |---|---|---|
-| Peak RSS, full application | **1.73 GB** | 7 GB — **PASS** |
-| Peak RSS, bare model | **1.19 GB** | → `S_eff` **83.0** |
-| Throughput | **40.0 tok/s** | 15 tok/s reference — **capped at 100** |
-| Time to first token (p50 / p95) | **22.1 s / 26.6 s** | — |
-| Prompt size sent to the model | ~802 tokens | — |
+| Peak RSS, full application | **1.71 GB** | 7 GB — **PASS**, → `S_eff` **75.5** |
+| RSS after model load, before generation | 1.41 GB | — |
+| Throughput | **38.0 tok/s** (p50) | `S_perf` **not computable from this figure** — see §3.3 |
+| Time to first token (p50 / p95) | **17.9 s / 20.2 s** | — |
+| Prompt size sent to the model | ~773 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
 | ARC-Easy `acc` / `acc_norm` (50 samples) | **0.740 / 0.780** | — |
 | Retrieval coverage (**held-out test**, relevance-checked) | **100%** (31/31) | 80% — **PASS** |
 | Refusal accuracy (**held-out test**) | **100%** (6/6) | 80% — **PASS** |
-| Retrieval latency p50 / p95 | 76 ms / 89 ms | — |
+| Retrieval latency p50 / p95 | 69 ms / 90 ms | — |
+| Searchable index | **29,959 chunks / 995 documents** | — |
 | Index build, 31,682 chunks | one-off, peak 0.18 GB | one-off |
 | Sustained-load throughput decay (20 min continuous) | **1.0%** | <10% — no throttling signature (§6.7) |
 | Peak core temperature | null — host exposes no sensor (§6.7) | 85 °C penalty threshold |
 | **Offline operation** | **verified, `--network none`** | — |
 
-Predicted peak was 3.26 GB; measured 1.73 GB. The estimate was conservative in
-the right direction, largely because it budgeted for a 3B model and a resident
-translation model, neither of which the final design uses.
+Every row above is read from `bench/results/benchmark.json`, `coverage.json` and
+`thermal.json`, regenerated on 2026-08-14 and committed alongside this report.
+That provenance sentence is here because it was not true of the previous version
+of this table, and the failure is instructive enough to record rather than
+quietly correct.
+
+**The table was reporting numbers no committed artifact contained.** It quoted
+1.73 GB, 40.0 tok/s and TTFT of 22.1 s / 26.6 s while the only committed
+`benchmark.json` described the *3B* configuration rejected in §3.3. The figures
+had been transcribed from a run whose output was never committed, and then
+edited by hand as the design changed. Re-running the harness against the shipped
+1.5B produced the table above: peak RSS 1.71 GB rather than 1.73, throughput
+38.0 rather than 40.0, and TTFT p50 17.9 s rather than 22.1 s.
+
+The corrections are small and two of the three are *favourable*, which is the
+part worth dwelling on. Nothing here was inflated on purpose, and that is
+precisely why it went unnoticed for so long: a hand-maintained number that
+happens to be pessimistic raises no alarm and still cannot be reproduced by a
+reviewer. §8 claims every figure traces to a committed script. Until this run,
+the headline table was the one place that claim did not hold.
+
+**Predicted 1.85 GB; measured 1.71 GB.** The previous prediction was 3.26 GB —
+a 1.5 GB miss that §6.0 explained away as conservatism, on the grounds that it
+budgeted for a 3B model and a resident translation model. That explanation was
+correct and was also the wrong response: `MEMORY_BUDGET` in `agbe/config.py`
+exists so that a drift between intent and reality shows up as a diff, and it had
+itself drifted to describe a design two decisions out of date. It now describes
+the shipped system, and the gap it reports is 8%.
+
+**Two chunk counts appear above and both are correct.** The index *builds*
+31,682 chunks; the index that *serves* holds 29,959, from 995 documents. The
+difference is 1,723 chunks belonging to seven NoDerivatives-licensed documents,
+dropped by `agbe/rag/index.py` at load rather than at build, because the licence
+gate learned to reject NoDerivatives after those documents were already embedded
+and a re-index costs hours. Enforcing at load means the shipped system cannot
+retrieve from them whatever the on-disk index contains.
+
+That distinction had gone unreported, and it mattered more than a footnote: the
+committed coverage result predated the exclusion, so the headline 100% had been
+measured against an index 1,723 chunks larger than the one that ships. Since
+removing chunks can only lose retrieval hits, the figure needed re-earning on
+the smaller index rather than assuming. Re-run on the held-out test split
+against the shipped 29,959: **still 100% (31/31), refusal still 100% (6/6)**.
+The claim survives; it just had not been tested in the form it was being made.
 
 **The performance figures moved late, and the reason is worth stating.** An
 earlier run of this table reported TTFT of 65 s. The cause was not the model:
@@ -495,7 +633,7 @@ disabling Pidgin detection that the server supported and the tests exercised.
 The structural fix, not the instance fix: generation and dosage-guarding now
 live in exactly one method, `AdvisoryEngine.guarded_stream()`, and `stream()`,
 `/ask` and the benchmark are all consumers of the same entry points. TTFT fell
-from 65 s to 22 s and wall clock for six questions halved. This defect class —
+from 65 s to 18 s and wall clock for six questions halved. This defect class —
 a second code path that looks equivalent, is not, and is the one a judge will
 exercise — has now appeared four times in this project (the others: the web UI
 skipping scope guards, and `models.lock.json` pinning a different model from
@@ -511,8 +649,17 @@ mosaic disease** — both cassava, both pests, and the metric could not tell the
 apart. It reported **88%**.
 
 Each question now carries expected-content terms, and a hit requires one to
-appear in a retrieved passage. True coverage is **80%**. The earlier figure was
+appear in a retrieved passage. True coverage was **80%**. The earlier figure was
 inflated and is recorded here rather than quietly replaced.
+
+The corpus harvest that followed closed most of that gap: re-run on the shipped
+index, dev coverage is **93.3% (28/30)**, committed as
+`bench/results/coverage_dev.json`. Both remaining failures are weather questions
+— season onset and flood response — and both fail as *"no passage above
+threshold"*, the corpus-gap mode rather than the retrieval mode. That is
+consistent with §1's claim that extension literature carries weather *decision
+guidance*: it carries less of it than of crop pathology, and the two questions
+we cannot answer are the honest edge of that.
 
 The new metric separates two failure types the old one conflated:
 
@@ -800,11 +947,11 @@ more than finding them hidden.
 
 ```bash
 make build            # ubuntu:22.04 reference image
-make fetch-models     # checksum-verified weights (~2.6 GB)
-make convert-models   # NLLB -> CTranslate2 int8 (throwaway torch image)
+make fetch-models     # checksum-verified weights (~1.2 GB, both models)
 make fetch-corpus     # vetted documents + provenance manifest
 make index            # build retrieval index
-make coverage         # retrieval coverage + refusal accuracy
+make coverage         # retrieval coverage + refusal accuracy (dev split)
+make coverage ARGS="--split test"    # the held-out figures quoted in §6.0
 make bench            # memory, latency, throughput
 make run              # serve at :8000 under the 7 GB cap
 ```
@@ -854,11 +1001,13 @@ harvester prints an explicit incomplete-corpus warning.
 
 **African language support — Nigerian Pidgin (`pcm_Latn`).**
 
-Every fixed message the system emits in Pidgin — the refusal, the
-banned-pesticide warning, the dosage refusal, the veterinary withdrawal-period
-warning, the staleness warning, the medical redirect, plus 22 domain terms — was
-reviewed and approved by a Nigerian Pidgin speaker on 2026-08-07. The set is
-committed at `bench/pidgin_eval.json`.
+All seven fixed messages the system emits in Pidgin — the refusal, the
+banned-pesticide warning, the redaction notice shown when an invented dosage is
+removed, the separate refusal shown when a dosage is *asked for*, the veterinary
+withdrawal-period warning, the staleness warning and the pesticide-exposure
+medical redirect, plus 22 domain terms — were reviewed and approved by a
+Nigerian Pidgin speaker on 2026-08-07. The set is committed at
+`bench/pidgin_eval.json` as `pcm-s01` through `pcm-s07`.
 
 **How that review was conducted, stated precisely:** the reviewer read the full
 draft set and approved it as a whole, rather than marking each line
@@ -883,4 +1032,4 @@ bonus it would earn.
 absence of PyTorch, validated strings instead of a resident translation model,
 the choice to move *down* in model size when measurement showed a larger model
 bought no accuracy, and exact search instead of an ANN index. Peak RSS is
-**1.73 GB against the 7 GB ceiling**. See §3.
+**1.71 GB against the 7 GB ceiling**. See §3.

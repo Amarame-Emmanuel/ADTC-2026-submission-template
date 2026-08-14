@@ -66,18 +66,36 @@ class LLMConfig:
     #:
     #: ARC-Easy over 50 samples - the profiler's own benchmark and sample count
     #: - gave 0.740 acc / 0.780 acc_norm against the 3B's 0.740 / 0.760. The 3B
-    #: showed no accuracy advantage while costing 13.3 points of S_eff (2.12 GB
-    #: peak RSS against 1.19 GB) and half the throughput. It needed to win
-    #: accuracy by >5.3 points to break even and won by zero. See REPORT.md §3.3.
+    #: showed no accuracy advantage while costing 10.7 points of S_eff (2.47 GB
+    #: peak RSS against 1.71 GB, both full-application) and half the throughput.
+    #: It needed to win accuracy by >4.3 points to break even and won by zero.
+    #: See REPORT.md §3.3.
     repo_id: str = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-    filename: str = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
 
-    #: 4096 keeps the KV cache near 150 MB thanks to Qwen2.5's grouped-query
-    #: attention (2 KV heads). Retrieved context is budgeted to fit inside this
-    #: rather than growing the window, because KV cache is the one memory cost
-    #: that scales with conversation length and can therefore surprise us
-    #: mid-demo.
-    n_ctx: int = 4096
+    #: Overridable so the A/B in §3.3 can be re-run against another GGUF in
+    #: models/ without editing source. That comparison was previously only
+    #: reproducible by patching this line, which is why its two columns ended up
+    #: measured on different harnesses and had to be re-stated as not
+    #: like-for-like. A reviewer should be able to reproduce a claim with an
+    #: environment variable, not a diff.
+    filename: str = os.environ.get(
+        "AGBE_LLM_FILENAME", "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    )
+
+    #: Sized from what the pipeline actually sends, not from what the model
+    #: could accept. Measured prompts run ~773 tokens (retrieval is capped at
+    #: `RetrievalConfig.context_token_budget`, and top_k is fixed), and
+    #: `max_tokens` below caps the answer at 512. Worst case is therefore under
+    #: 1,300 tokens, so 2048 leaves ~750 tokens of headroom.
+    #:
+    #: This was 4096, which cost ~60 MB of KV cache reserved for context the
+    #: system has no path to producing. Qwen2.5's grouped-query attention (2 KV
+    #: heads) makes the cache cheap per token, which is exactly why the waste
+    #: went unnoticed - cheap per token is not the same as free.
+    #:
+    #: The cache is reserved up front rather than grown on demand: we would
+    #: rather fail at load than creep over the ceiling mid-demo.
+    n_ctx: int = 2048
     n_threads: int = DEFAULT_THREADS
 
     #: Low temperature: this is an advisory system where a confidently
@@ -236,12 +254,21 @@ RETRIEVAL = RetrievalConfig()
 #: Component-by-component estimate, in bytes, used by `bench` to report
 #: predicted-vs-measured. Keeping the prediction in code means a regression
 #: shows up as a diff rather than as a stale paragraph in a report.
+#:
+#: That is exactly what went wrong with the previous version of this dict, so
+#: the failure is worth recording where it happened. It kept budgeting 1.90 GB
+#: of weights for the 3B rejected in REPORT.md 3.3, and 620 MB for the NLLB
+#: bridge rejected in 3.2, long after both decisions were made. It therefore
+#: predicted 3.26 GB against a measured 1.73 GB, and the report explained the
+#: 1.5 GB gap away as conservatism instead of reading it as the signal it was:
+#: a prediction is only a regression detector while it describes the shipped
+#: system. Weight figures below are the pinned file sizes from models.lock.json
+#: rather than round numbers, so a model swap shows up here as a diff.
 MEMORY_BUDGET: dict[str, int] = {
-    "llm_weights_q4_k_m": 1_900_000_000,
-    "llm_kv_cache_4k": 155_000_000,
-    "llm_compute_buffers": 300_000_000,
-    "embedding_model_q8": 50_000_000,
-    "translation_int8": 620_000_000,
+    "llm_weights_q4_k_m": 1_117_320_736,   # qwen2.5-1.5b-instruct-q4_k_m.gguf
+    "llm_kv_cache_2k": 60_000_000,         # 28 layers x 2 KV heads x 128 dim, f16
+    "llm_compute_buffers": 250_000_000,
+    "embedding_model_q8": 36_806_944,      # bge-small-en-v1.5-q8_0.gguf
     "index_and_corpus": 60_000_000,
     "python_runtime_and_server": 400_000_000,
 }
