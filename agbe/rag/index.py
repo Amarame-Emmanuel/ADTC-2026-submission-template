@@ -70,6 +70,60 @@ class SearchHit:
     rank: int
 
 
+def _demote_off_crop(
+    fused: list[int], chunks: list[Chunk], query_text: str
+) -> list[int]:
+    """Move candidates about a DIFFERENT crop to the back of the queue.
+
+    Measured across the 70 evaluation questions: **18 of 250 retrieved slots
+    (7.2%) went to passages about a crop the question did not ask about** - a
+    maize seed-production page for a cassava question, rice for tomato,
+    groundnut for pepper. Eleven questions were affected. Those slots are not
+    free: `top_k` is 6, and the control advice that section 6.8 could not surface
+    loses by as little as 0.023 to the sixth-placed passage.
+
+    DEMOTION, NOT EXCLUSION, AND THE CASE THAT FORCED IT
+    ----------------------------------------------------
+    A hard filter was the obvious design and is wrong. `crop-23` - "small white
+    insects fly up when I shake my tomato plants" - retrieves a **Whiteflies**
+    document that mentions cassava and not tomato, so a filter would discard it.
+    Whitefly biology is exactly the same insect on both crops. Cross-crop
+    material is often the right answer.
+
+    So off-crop passages are ordered last rather than removed. If there are not
+    enough on-crop passages to fill `top_k`, they still appear - which keeps this
+    from ever *reducing* the evidence the model receives.
+
+    THREE CATEGORIES, NOT TWO
+    -------------------------
+    Passages naming no in-scope crop at all - general disease principles,
+    storage practice, whitefly biology written generically - are treated as
+    NEUTRAL and never demoted. Demotion applies only to a passage that names
+    some other crop *and not* the one asked about, which is the narrowest
+    reading of "off-topic" available.
+    """
+    from agbe.rag.scope import crops_mentioned
+
+    wanted = crops_mentioned(query_text)
+    if not wanted:
+        return fused
+
+    on_crop: list[int] = []
+    off_crop: list[int] = []
+    for idx in fused:
+        c = chunks[idx]
+        found = crops_mentioned(f"{c.title} {c.text}")
+        # Neutral (names no crop) counts as on-topic, deliberately.
+        if found and not (found & wanted):
+            off_crop.append(idx)
+        else:
+            on_crop.append(idx)
+
+    # Stable within each group: fusion order is preserved, only the partition
+    # is new.
+    return on_crop + off_crop
+
+
 class VectorIndex:
     """Exact cosine-similarity search over normalised passage vectors."""
 
@@ -153,6 +207,13 @@ class VectorIndex:
         # acceptable passage rather than simply lost, so filtering does not
         # quietly shrink the evidence the model gets.
         fused = reciprocal_rank_fusion(dense_top, lexical_top, top_k=top_k * 3)
+
+        # Off-crop passages go to the BACK OF THE QUEUE, before top_k is taken.
+        #
+        # Doing this after selection would be pure theatre - the same six
+        # passages returned in a different order. It has to change which
+        # candidates are considered, not how the chosen ones are sorted.
+        fused = _demote_off_crop(fused, self.chunks, query_text)
 
         # Passages the lexical ranker put at the very top are exempt from the
         # dense floor.

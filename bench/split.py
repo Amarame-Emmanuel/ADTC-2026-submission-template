@@ -28,6 +28,48 @@ drift out of sync with the questions. Adding a question later assigns it to a
 side without disturbing anything already assigned - which a shuffled split
 would not guarantee.
 
+THE VERSION THAT DID NOT KEEP THAT PROMISE
+------------------------------------------
+The paragraph above was true of the intent and false of the code. Assignment
+used to be by POSITION within a hash-sorted stratum:
+
+    ordered = sorted(group, key=lambda q: _bucket(q["id"]))
+    cut = round(len(ordered) * DEV_FRACTION)
+    dev.extend(ordered[:cut]); test.extend(ordered[cut:])
+
+The hash fixed the ORDER; the cut point moved with the size of the stratum. So
+adding one question shifted the boundary and could push an existing question
+across it. Measured: adding 8 out-of-scope questions moved oos-05 and oos-08
+from TEST to DEV.
+
+That is the worst kind of defect for this file, because the failure is silent
+and retroactive. Every previously published dev and test number would have
+started referring to a different set of questions than the one that produced
+it, with nothing in the output to say so - and SPLIT_SALT exists precisely so
+that a reshuffle is "an explicit, visible act rather than something that
+happens by accident".
+
+Assignment is now by hash THRESHOLD, which cannot move:
+
+    dev if _bucket(q["id"]) < DEV_FRACTION else test
+
+A question's side is a property of its own id and DEV_FRACTION alone. No other
+question can affect it, so the set can be extended freely - which is what
+unblocks writing the framed-question variants (REPORT.md 7.11) and the extra
+out-of-scope questions that refusal accuracy needs to have any resolution.
+
+THE COST, STATED
+----------------
+Thresholding gives up EXACT stratum balance. Positional cutting guaranteed
+round(n * 0.5) per stratum; a threshold gives that only in expectation, so a
+6-question area might split 4/2 rather than 3/3.
+
+Stratification is still applied and still does its job - it is what stops an
+area landing entirely on one side - but the balance is now approximate. At
+these sizes that is the right trade: a guarantee that holds is worth more than
+a balance that is exact, and the alternative was a file whose central promise
+was untrue.
+
 Stratified by advisory area so that neither side loses a whole area: with only
 6 weather questions, a naive 50/50 could easily leave one side with none.
 """
@@ -72,12 +114,16 @@ def split_questions(questions: list[dict] | None = None) -> dict[str, list[dict]
     dev: list[dict] = []
     test: list[dict] = []
     for group in strata.values():
-        # Sort by hash so assignment within a stratum is stable and balanced
-        # rather than dependent on file order.
-        ordered = sorted(group, key=lambda q: _bucket(q["id"]))
-        cut = round(len(ordered) * DEV_FRACTION)
-        dev.extend(ordered[:cut])
-        test.extend(ordered[cut:])
+        # Threshold, not position. A question's side depends only on its own id
+        # and DEV_FRACTION, so adding questions cannot move existing ones. See
+        # the module docstring for the version that got this wrong and the
+        # measurement that caught it.
+        #
+        # Sorted by hash first so the two sides come out in a stable order
+        # regardless of file order - cosmetic, but it keeps diffs of any
+        # printed split readable.
+        for q in sorted(group, key=lambda q: _bucket(q["id"])):
+            (dev if _bucket(q["id"]) < DEV_FRACTION else test).append(q)
 
     dev.sort(key=lambda q: q["id"])
     test.sort(key=lambda q: q["id"])

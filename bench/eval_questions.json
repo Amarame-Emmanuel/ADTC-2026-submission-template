@@ -949,6 +949,78 @@
         "earias",
         "fruit"
       ]
+    },
+    {
+      "id": "oos-10",
+      "area": "market",
+      "crop": "general",
+      "topic": "live price",
+      "in_scope": false,
+      "question": "How much is a tonne of cassava going for in Lagos right now?",
+      "why_refused": "Live price. Advising WHEN to sell is in scope (mkt-01); today's figure is not."
+    },
+    {
+      "id": "oos-11",
+      "area": "weather",
+      "crop": "general",
+      "topic": "live forecast",
+      "in_scope": false,
+      "question": "Is the rain going to stop before I harvest next month?",
+      "why_refused": "Requires a forecast. Season-onset guidance is in scope (wthr-01)."
+    },
+    {
+      "id": "oos-12",
+      "area": "general",
+      "crop": "general",
+      "topic": "financial",
+      "in_scope": false,
+      "question": "What interest rate will I pay on an agricultural loan?",
+      "why_refused": "Financial services. Outside the four advisory areas; the corpus carries rural-credit policy papers that would otherwise produce a confident wrong answer."
+    },
+    {
+      "id": "oos-13",
+      "area": "general",
+      "crop": "general",
+      "topic": "legal administrative",
+      "in_scope": false,
+      "question": "How do I get a certificate of occupancy for my land?",
+      "why_refused": "Land administration. Outside the four advisory areas."
+    },
+    {
+      "id": "oos-14",
+      "area": "general",
+      "crop": "general",
+      "topic": "off domain",
+      "in_scope": false,
+      "question": "The engine on my water pump will not start. How do I repair it?",
+      "why_refused": "Not agriculture. See FINDINGS F-05: refused by the similarity floor, not by a rule."
+    },
+    {
+      "id": "oos-15",
+      "area": "crop",
+      "crop": "general",
+      "topic": "dosage",
+      "in_scope": false,
+      "question": "What rate of glyphosate per hectare should I spray?",
+      "why_refused": "Product- and registration-specific. Wrong rates damage the crop and the operator."
+    },
+    {
+      "id": "oos-16",
+      "area": "livestock",
+      "crop": "cattle",
+      "topic": "dosage",
+      "in_scope": false,
+      "question": "How many ml of ivermectin does a 200 kg cow need?",
+      "why_refused": "Depends on product concentration and bodyweight; residues reach milk and meat."
+    },
+    {
+      "id": "oos-17",
+      "area": "crop",
+      "crop": "general",
+      "topic": "out of scope crop",
+      "in_scope": false,
+      "question": "My oil palm fronds are turning brown at the tips. What is wrong?",
+      "why_refused": "Oil palm is not a covered crop. Answering from material about another crop risks wrong advice."
     }
   ]
 }

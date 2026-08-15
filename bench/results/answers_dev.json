@@ -1,22 +1,48 @@
 {
-  "generated_at": "2026-08-15T08:18:04+00:00",
+  "generated_at": "2026-08-15T09:57:32+00:00",
   "split": "dev",
-  "n_in_scope": 30,
-  "n_out_scope": 3,
-  "elapsed_s": 907.4,
-  "answer_accuracy": 0.9,
+  "n_in_scope": 33,
+  "n_out_scope": 5,
+  "elapsed_s": 754.8,
+  "answer_accuracy": 0.8788,
   "counts": {
-    "OK": 27,
-    "NOT_USED": 1,
+    "OK": 29,
+    "NOT_USED": 2,
     "MISSED": 2,
     "UNGROUNDED": 0
   },
   "refusal": {
-    "refused": 3,
-    "total": 3,
+    "refused": 5,
+    "total": 5,
     "value": 1.0
   },
   "rows": [
+    {
+      "id": "crop-01",
+      "area": "crop",
+      "crop": "cassava",
+      "question": "My cassava leaves are yellow and twisted and the plant is small. What is wrong?",
+      "verdict": "OK",
+      "refused": false,
+      "expect_any": [
+        "mosaic",
+        "whitefly",
+        "bemisia",
+        "cmd"
+      ],
+      "terms_in_answer": [
+        "mosaic",
+        "whitefly",
+        "cmd"
+      ],
+      "terms_in_sources": [
+        "mosaic",
+        "whitefly",
+        "bemisia",
+        "cmd"
+      ],
+      "answer_head": "The symptoms you're describing, such as yellow and twisted leaves and a small, distorted plant, could be indicative of several diseases affecting cassava. Here are some steps you can take to address the issue: 1. **Ident"
+    },
     {
       "id": "crop-02",
       "area": "crop",
@@ -42,7 +68,7 @@
         "cutting",
         "spread"
       ],
-      "answer_head": "Cassava mosaic spreads from one plant to another passively by wind, spreading from one plant to another. It is also spread through the use of infested planting materials. The virus is also believed to be spread from plan"
+      "answer_head": "Cassava mosaic spreads through wind and infected planting materials, and can also be spread by Bemisia tabaci, the whitefly that causes African cassava mosaic virus (ACMV). It's important to plant cassava in large, compa"
     },
     {
       "id": "crop-03",
@@ -59,6 +85,7 @@
         "clean"
       ],
       "terms_in_answer": [
+        "cutting",
         "healthy"
       ],
       "terms_in_sources": [
@@ -66,7 +93,7 @@
         "planting material",
         "healthy"
       ],
-      "answer_head": "Select and use healthy, pest/disease-free stems. Cut into 2- or 3-node stakes. Avoid top green stems, which dehydrate quickly and are easily damaged by disease. Use healthy, middle-brown portions for better plant growth."
+      "answer_head": "Select and use healthy, pest/disease-free stems from cassava plants. Cut them into 2-node or 3-node stakes using secateurs, a sharp knife/machete, or a stake cutting machine. Avoid using force when tying the stems in bun"
     },
     {
       "id": "crop-04",
@@ -93,7 +120,7 @@
         "necrosis",
         "rot"
       ],
-      "answer_head": "I recommend monitoring your cassava plants closely for symptoms of root rot disease. If you notice brown, rotten patches inside the roots, it's likely root rot disease. Confirm this by uprooting the plant and examining t"
+      "answer_head": "I suggest monitoring your cassava plants for signs of disease, focusing on brown streak disease and rotted roots. Keep an eye out for yellow patches on leaves and dark brown streaks on stems, indicating rotted roots. If "
     },
     {
       "id": "crop-05",
@@ -108,7 +135,7 @@
       ],
       "terms_in_answer": [],
       "terms_in_sources": [],
-      "answer_head": "I recommend using a water-soluble insecticidal soap or a neem oil spray to control the spiraling whitefly. These natural products are less likely to harm your crops and are safer for the environment. Additionally, ensure"
+      "answer_head": "To address the white cottony insects on your cassava growing tip, start by removing any affected leaves and stems. Next, clean the area around the growing tip to prevent the spread of pests. Consider using a water-solubl"
     },
     {
       "id": "crop-10",
@@ -125,7 +152,6 @@
         "metre"
       ],
       "terms_in_answer": [
-        "spacing",
         "apart",
         "1 m"
       ],
@@ -134,7 +160,7 @@
         "apart",
         "1 m"
       ],
-      "answer_head": "For cassava, plant 1 meter apart from each other in a sole crop setting. If intercropping, ensure there's enough space for the branching habit of both cassava and other crops. Keep the planting upright for best storage, "
+      "answer_head": "For cassava, plant 1 meter apart from each other when grown alone. For intercropping, consider the branching habits of both cassava and other crops, ensuring adequate space. Keep the land flat or gently sloping, avoiding"
     },
     {
       "id": "crop-12",
@@ -159,7 +185,7 @@
         "chilo",
         "borer"
       ],
-      "answer_head": "To address the issue of broken maize stems and holes in them, start by removing crop residues from the field and feeding them to livestock or making compost. This practice helps break the cycle of the stem borer. Additio"
+      "answer_head": "1. To prevent stem damage, avoid planting maize in fields where the African maize stalk borer has been active in the past. This pest can cause severe damage by feeding inside the maize stem, resulting in wilting or break"
     },
     {
       "id": "crop-13",
@@ -173,13 +199,14 @@
         "witchweed"
       ],
       "terms_in_answer": [
+        "striga",
         "witchweed"
       ],
       "terms_in_sources": [
         "striga",
         "witchweed"
       ],
-      "answer_head": "1. To manage the root rot caused by Pythium species, you can use a combination of cultural practices and biological control methods. Avoid overhead watering and ensure proper drainage to prevent waterlogging, which can l"
+      "answer_head": "1. **Integrated Pest and Disease Management in Major Agroecosystems: Project PE-1. Annual Report 2004 (2005)** The different Pythium species caused typical root rot symptoms on susceptible bean cultivar CAL 96 in screen "
     },
     {
       "id": "crop-15",
@@ -204,7 +231,7 @@
         "nitrogen",
         "deficien"
       ],
-      "answer_head": "1. **Maize Seed Production (Revised) (2018)**: **Kranz** recommends applying a balanced fertilizer, such as a 15-15-15 blend, at the time of planting. This helps in preventing nitrogen deficiency and promotes healthy gro"
+      "answer_head": "First, check for leafhoppers, which can spread maize streak virus. Next, look for anthracnose, a fungal disease. For nitrogen deficiency, ensure your soil is rich and avoid over-fertilizing. For southern leaf blight, mon"
     },
     {
       "id": "crop-20",
@@ -227,7 +254,7 @@
         "ralstonia",
         "wilt"
       ],
-      "answer_head": "1. **Preventive Measures**: Implement good agricultural practices, including proper soil management and avoiding overwatering, which can exacerbate bacterial wilt symptoms. 2. **Cultural Control**: Avoid planting in area"
+      "answer_head": "To prevent your tomato plants from wilting suddenly during the day, focus on maintaining good drainage and avoiding wet, humid conditions. This can help prevent the spread of bacterial diseases like bacterial wilt, which"
     },
     {
       "id": "crop-22",
@@ -244,7 +271,7 @@
       ],
       "terms_in_answer": [],
       "terms_in_sources": [],
-      "answer_head": "Identify the pest: Tomato whitefly (Bemisia tabaci). [1] Inspect the leaves: Look for white, winged insects on the lower leaves. [1] Monitor: Check regularly for whitefly activity, especially in areas with high humidity "
+      "answer_head": "Check for whiteflies. Use insecticidal soap or pyrethrin spray to control them. Keep the area clean and free of debris. If the problem persists, consider using a biological control method or consulting a local agricultur"
     },
     {
       "id": "crop-23",
@@ -264,7 +291,7 @@
         "whitefly",
         "bemisia"
       ],
-      "answer_head": "Inspect your tomato plants for signs of whitefly. If you find them, start monitoring daily. Use a strong water spray to knock them off the leaves. If you notice a significant increase in whiteflies, consider using a natu"
+      "answer_head": "Identify the problem Whiteflies are small, 2 mm in size, and often sit underneath leaves. They fly off when you shake plants. They extract sap from the undersides of leaves but are problematic because they transmit tomat"
     },
     {
       "id": "crop-24",
@@ -291,14 +318,14 @@
         "seedling",
         "transplant"
       ],
-      "answer_head": "To raise healthy tomato seedlings in a nursery, follow these steps: 1. **Prepare the Seedbed**: - Use a nursery bed that is 60-120 cm wide and 20-25 cm high. - Ensure the length of the nursery bed depends on the number o"
+      "answer_head": "To raise healthy tomato seedlings in a nursery, follow these steps: 1. Choose a nursery site away from tomato fields to avoid disease spread. 2. Prepare the seedbed: 60-120 cm wide and 20-25 cm high. The length depends o"
     },
     {
       "id": "crop-25",
       "area": "crop",
       "crop": "general",
       "question": "Should I plant the same crop in the same place every year?",
-      "verdict": "NOT_USED",
+      "verdict": "OK",
       "refused": false,
       "expect_any": [
         "rotation",
@@ -306,13 +333,15 @@
         "same field",
         "monocultur"
       ],
-      "terms_in_answer": [],
+      "terms_in_answer": [
+        "rotate"
+      ],
       "terms_in_sources": [
         "rotation",
         "rotate",
         "same field"
       ],
-      "answer_head": "No, you should not plant the same crop in the same place every year. This can lead to pests and diseases building up, making it harder for your crops to grow. Instead, try rotating crops to different places or different "
+      "answer_head": "No, you should not plant the same crop in the same place every year. This can lead to pests and diseases building up, making it difficult for the crop to grow. Instead, rotate crops to different places or different types"
     },
     {
       "id": "crop-27",
@@ -326,14 +355,13 @@
         "weeding"
       ],
       "terms_in_answer": [
-        "weed",
-        "weeding"
+        "weed"
       ],
       "terms_in_sources": [
         "weed",
         "weeding"
       ],
-      "answer_head": "Weed control is crucial for rice fields to prevent grasses from choking the plants. Typically, grasses should be weeded twice: at 2-3 weeks and 5-6 weeks after sowing. Pull weeds by hand or with a small hand hoe, and hea"
+      "answer_head": "Weed control is crucial for rice production in Nigeria. The best time to weed is after the rice seedlings have established, typically around 2-3 weeks after sowing and 5-6 weeks after sowing. Pull weeds by hand or with a"
     },
     {
       "id": "crop-28",
@@ -361,7 +389,7 @@
         "storage",
         "grain"
       ],
-      "answer_head": "1. **Harvesting Rice**: After harvesting, rice grains should be dried within 24 hours to prevent discoloration and pest problems. Threshing is the next step to separate the grains from the husks. After threshing, the gra"
+      "answer_head": "1. Harvest rice when 80-90% of the panicules are mature or turn yellow. This helps prevent pest infestations and ensures good grain quality. 2. For post-harvest practices, bundle the rice stems after cutting and dry them"
     },
     {
       "id": "crop-30",
@@ -377,6 +405,7 @@
         "pod borer"
       ],
       "terms_in_answer": [
+        "maruca",
         "flower"
       ],
       "terms_in_sources": [
@@ -385,7 +414,7 @@
         "flower",
         "pod borer"
       ],
-      "answer_head": "To address the issue of cowpea flowers falling off before they make pods, consider the following steps: 1. **Preventive Measures**: Ensure good air circulation around the plants and avoid overcrowding. This helps reduce "
+      "answer_head": "To address the issue of cowpea flowers falling off before they make pods, consider the following practical steps: 1. **Preventive Measures**: - Ensure the field is well-ventilated and shaded to reduce humidity and promot"
     },
     {
       "id": "crop-34",
@@ -408,7 +437,7 @@
         "fusarium",
         "ralstonia"
       ],
-      "answer_head": "To prevent and control the sudden wilting and death of your pepper plants, focus on improving drainage and managing soil moisture. Avoid working directly under the yellow spots on the leaves, as this can indicate a funga"
+      "answer_head": "I'm sorry to hear about your pepper plants. Let's address the issue step by step. 1. **Check the soil drainage**: Ensure that the soil is well-draining, especially during the hot, wet season. Poor drainage can exacerbate"
     },
     {
       "id": "crop-35",
@@ -430,7 +459,27 @@
         "rot",
         "anthracnose"
       ],
-      "answer_head": "It sounds like your pepper plants are experiencing some issues. Here are some steps you can take to address the problem: 1. **Inspect the Plant**: Look for signs of pests or diseases. Check for holes in the fruits and ro"
+      "answer_head": "To address the holes in your pepper fruits and rot on the plant, start by rotating the crop with beans or maize to prevent disease spread. Control insect vectors such as aphids, which can cause additional damage. Ensure "
+    },
+    {
+      "id": "crop-37",
+      "area": "crop",
+      "crop": "okra",
+      "question": "Worms are boring into my okra pods",
+      "verdict": "NOT_USED",
+      "refused": false,
+      "expect_any": [
+        "borer",
+        "earias",
+        "fruit"
+      ],
+      "terms_in_answer": [],
+      "terms_in_sources": [
+        "borer",
+        "earias",
+        "fruit"
+      ],
+      "answer_head": "Scout your crop regularly. Early detection is key. Avoid high doses of nitrogen. Use biopesticides like Bt or neem-based pesticides. Target small caterpillars before they bore into the pods."
     },
     {
       "id": "lstk-01",
@@ -446,14 +495,15 @@
         "nervous"
       ],
       "terms_in_answer": [
-        "newcastle"
+        "newcastle",
+        "nervous"
       ],
       "terms_in_sources": [
         "newcastle",
         "twisting",
         "nervous"
       ],
-      "answer_head": "I'm sorry to hear about your chickens. Newcastle disease can cause sudden death in birds, leading to twisted necks and greenish diarrhea. It's important to act quickly to prevent the disease from spreading. Here are some"
+      "answer_head": "I'm sorry to hear about your chickens. Newcastle disease is a serious issue that can quickly kill your birds. Here are some steps to help prevent and manage Newcastle disease in your flock: 1. **Monitor and Control**: Ke"
     },
     {
       "id": "lstk-07",
@@ -469,14 +519,16 @@
         "tick-borne"
       ],
       "terms_in_answer": [
-        "tick"
+        "tick",
+        "acaricide",
+        "tick-borne"
       ],
       "terms_in_sources": [
         "tick",
         "acaricide",
         "tick-borne"
       ],
-      "answer_head": "To manage ticks on cattle, start by reducing the tick population on the cattle themselves. This can be done by rotating between fields with crops and pastures where livestock graze. Encourage the presence of birds like o"
+      "answer_head": "To manage ticks effectively, start by reducing the tick population on your cattle. This can be achieved through a combination of strategies: 1. **Grassland Management**: Alternate between fields with crops and pastures w"
     },
     {
       "id": "lstk-08",
@@ -500,7 +552,7 @@
         "udder",
         "milk"
       ],
-      "answer_head": "1. **Clean the udder**: Use an antiseptic solution to clean the udder and teats daily. Dry them thoroughly before milking. If the udder is very dirty, wash and dry them in good time before milking starts. 2. **Check for "
+      "answer_head": "1. **Maintain good hygiene practices** to prevent the spread of germs. Regularly wash the udders and teats with antiseptic solutions, especially before milking. Ensure the udders are dry and clean before milking starts t"
     },
     {
       "id": "lstk-09",
@@ -531,7 +583,7 @@
         "dry season",
         "crop residue"
       ],
-      "answer_head": "In the dry season when natural pastures are scarce, you can feed your animals on the following options: 1. **Herbage (Bourgou):** This includes grasses and other forage plants that grow naturally in the area. It's a good"
+      "answer_head": "In the dry season when there is no grass, you can feed your animals on the following options: 1. **Cowpea Hay**: Collect cowpea hay and store it for later use. Cowpea hay is a good source of protein and can be fed during"
     },
     {
       "id": "lstk-10",
@@ -554,7 +606,7 @@
         "milk",
         "treatment"
       ],
-      "answer_head": "After treating your cow with medicine, wait until the milk is clear and free of any visible signs of illness. This usually takes about 24 hours after treatment. It's best to wait longer, at least 48 hours, to ensure the "
+      "answer_head": "When the cow is fully recovered and no longer shows signs of illness, the milk is considered safe to drink. This typically takes several days, depending on the type of treatment and the cow's recovery rate. It's importan"
     },
     {
       "id": "mkt-01",
@@ -573,7 +625,9 @@
       "terms_in_answer": [
         "storage",
         "store",
-        "sell"
+        "sell",
+        "price",
+        "market"
       ],
       "terms_in_sources": [
         "storage",
@@ -582,7 +636,7 @@
         "price",
         "market"
       ],
-      "answer_head": "[1] Impact evaluation protocols for agricultural projects: the case of yam improvement for income and food security in West Africa - Yams are sold and used at home and as seed. 71 parts out of 100 sold, 9 parts used at h"
+      "answer_head": "[1] For storage, consider using hermetic bags to prevent pests, especially larger grain borers (LGB). Uganda, Malawi, and Zambia have shown that maize stored in hermetic bags for three years can be profitable. The best s"
     },
     {
       "id": "mkt-03",
@@ -607,14 +661,14 @@
         "flour",
         "perishab"
       ],
-      "answer_head": "Fresh cassava roots are often sold before processing, especially by traditional farmers. Selling fresh roots allows them to meet immediate financial needs without the hassle of processing. However, processing can lead to"
+      "answer_head": "Fresh cassava roots are typically sold to market traders before they are harvested. This practice is common among traditional farmers who lack knowledge about processing and marketing. Selling fresh roots allows them to "
     },
     {
       "id": "mkt-05",
       "area": "market",
       "crop": "general",
       "question": "Is there an advantage to selling together with other farmers?",
-      "verdict": "OK",
+      "verdict": "NOT_USED",
       "refused": false,
       "expect_any": [
         "group",
@@ -623,9 +677,7 @@
         "cooperative",
         "bulk"
       ],
-      "terms_in_answer": [
-        "collective"
-      ],
+      "terms_in_answer": [],
       "terms_in_sources": [
         "group",
         "collective",
@@ -633,7 +685,7 @@
         "cooperative",
         "bulk"
       ],
-      "answer_head": "Yes, selling together with other farmers can offer several advantages. By pooling resources, you can attract better prices and reduce costs. This collective effort can also enhance the quality of your products, making th"
+      "answer_head": "Yes, selling together with other farmers can be advantageous. [1] [2] [3] [4] [5] [6]"
     },
     {
       "id": "mkt-07",
@@ -661,7 +713,7 @@
         "rot",
         "store"
       ],
-      "answer_head": "To reduce losses when storing yam before selling, you can use wood ash and lime wash on the damaged parts of the tubers to reduce storage rots. Curing the tubers at 35-40\u00b0C at relative humidity of 40-100% for seven days "
+      "answer_head": "To reduce losses when storing yam before selling, consider using wood ash and lime wash on the damaged parts of tubers to reduce storage rots. Curing the tubers at 35-40\u00b0C at relative humidity of 40-100% for seven days a"
     },
     {
       "id": "wthr-02",
@@ -677,6 +729,7 @@
         "establish"
       ],
       "terms_in_answer": [
+        "onset",
         "false start",
         "rain"
       ],
@@ -685,7 +738,35 @@
         "false start",
         "rain"
       ],
-      "answer_head": "To determine if the rains have truly started and not a false start, farmers should look for two key indicators: 2-3 days of rain exceeding 15-30 mm, and no dry spell longer than 7-21 days following the rain event. This m"
+      "answer_head": "To determine if the rains have truly started, look for signs of moisture that precede the rain, such as dew on leaves or soil moisture levels. Additionally, monitor the soil moisture content before the rain starts to ens"
+    },
+    {
+      "id": "wthr-03",
+      "area": "weather",
+      "crop": "general",
+      "question": "What can I do to protect my crops if the rain stops for two weeks?",
+      "verdict": "OK",
+      "refused": false,
+      "expect_any": [
+        "drought",
+        "dry spell",
+        "moisture",
+        "mulch",
+        "water"
+      ],
+      "terms_in_answer": [
+        "drought",
+        "dry spell",
+        "moisture",
+        "water"
+      ],
+      "terms_in_sources": [
+        "drought",
+        "dry spell",
+        "moisture",
+        "water"
+      ],
+      "answer_head": "If the rain stops for two weeks, farmers can take several preventive measures to protect their crops. First, they should monitor the soil moisture levels and ensure there is sufficient moisture for germination. If the so"
     },
     {
       "id": "wthr-04",
@@ -712,7 +793,7 @@
         "conserv",
         "cover"
       ],
-      "answer_head": "[1] To conserve soil moisture and lower soil temperature around plant roots for several days, you can use Tied Ridges and Mulching. These methods will help improve the yield. [2] If the weather conditions do not allow th"
+      "answer_head": "To conserve soil moisture and lower soil temperature around plant roots for several days, you can use Tied Ridges and Mulching. This will help to improve the yield."
     },
     {
       "id": "wthr-05",
@@ -737,7 +818,7 @@
         "drain",
         "waterlog"
       ],
-      "answer_head": "1. **Mosquito Control**: Vaccination of all domestic animals at the onset of heavy rains is a good precaution to protect humans from Rift Valley fever. 2. **Drainage and Flood Management**: Immediate clearing of existing"
+      "answer_head": "1. **Mosquito Control**: Implement mosquito control measures, such as vaccination of livestock and the use of insecticides. Regularly check for signs of mosquito breeding and address them promptly. 2. **Drainage and Floo"
     }
   ]
 }

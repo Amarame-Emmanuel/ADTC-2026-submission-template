@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T08:02:07+00:00",
+  "generated_at": "2026-08-15T10:24:28+00:00",
   "machine": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
     "processor": "x86_64",
@@ -20,24 +20,24 @@
     "value": 1.0,
     "target": 0.8,
     "pass": true,
-    "covered": 31,
-    "total": 31
+    "covered": 28,
+    "total": 28
   },
   "refusal": {
     "value": 1.0,
     "target": 0.8,
     "pass": true,
-    "refused": 6,
-    "total": 6
+    "refused": 8,
+    "total": 8
   },
   "retrieval_latency_ms": {
-    "p50": 71.9,
-    "p95": 105.35
+    "p50": 70.33,
+    "p95": 91.92
   },
   "per_crop": {
     "cassava": {
-      "covered": 6,
-      "total": 6,
+      "covered": 5,
+      "total": 5,
       "coverage": 1.0
     },
     "cowpea": {
@@ -46,8 +46,8 @@
       "coverage": 1.0
     },
     "general": {
-      "covered": 3,
-      "total": 3,
+      "covered": 2,
+      "total": 2,
       "coverage": 1.0
     },
     "goat": {
@@ -66,8 +66,8 @@
       "coverage": 1.0
     },
     "okra": {
-      "covered": 2,
-      "total": 2,
+      "covered": 1,
+      "total": 1,
       "coverage": 1.0
     },
     "poultry": {

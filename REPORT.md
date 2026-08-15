@@ -646,8 +646,8 @@ quantisation format, not the parameter count, decides `S_perf`).
 | Prompt size sent to the model | ~652 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
 | ARC-Easy `acc` / `acc_norm` (**200 samples**) | **0.685 / 0.695** | Q4\_K\_M: 0.695 / 0.720 |
-| Retrieval coverage (**held-out test**, relevance-checked) | **100%** (31/31) | 80% — **PASS** |
-| Refusal accuracy (**held-out test**) | **100%** (6/6) | 80% — **PASS** |
+| Retrieval coverage (**held-out test**, relevance-checked) | **100%** (28/28) | 80% — **PASS** |
+| Refusal accuracy (**held-out test**) | **100%** (4/4) | 80% — **PASS** |
 | Retrieval latency p50 / p95 | 64 ms / 94 ms | — |
 | Searchable index | **40,537 chunks / 995 documents** | — |
 | Index build, 43,177 chunks | one-off, peak 0.55 GB | one-off |
@@ -697,7 +697,7 @@ committed coverage result predated the exclusion, so the headline 100% had been
 measured against a larger index than the one that ships. Since removing chunks
 can only lose retrieval hits, the figure needed re-earning rather than assuming.
 Re-run on the held-out test split against the shipped index: **still 100%
-(31/31), refusal still 100% (6/6)**. The claim survives; it just had not been
+(28/28), refusal still 100% (4/4)**. The claim survives; it just had not been
 tested in the form it was being made.
 
 **The chunk count grew 36% for a reason, and it is §6.9's.** The corpus is
@@ -1069,7 +1069,8 @@ Raising the floor was measured and rejected: dev coverage is 96.7% at 0.70,
 value — so the floor cannot be tuned for this without spending coverage to buy
 an improvement dev cannot measure. `scope.check()` now refuses financial and
 legal-administrative questions before retrieval, for a stated reason. Refusal
-returns to 100% (6/6).
+returns to 100% (4/4 on the corrected split; 6/6 on the split in use when the
+regression was found).
 
 **Disclosure.** Those two questions are in the held-out split. They were
 inspected after they failed and the rule was written afterwards, so the 6/6 is
@@ -1192,14 +1193,22 @@ more than finding them hidden.
 13. **Answer accuracy is 90.0%, below the coverage figures quoted throughout
     §6.** Coverage measures retrieval; §6.9 measures the answer. The 6.7-point
     gap is one `NOT_USED` and two `MISSED` questions on the dev split.
-14. **The dev/test split is not stable when questions are added.**
-    `bench/split.py` promises that "adding a question later assigns it to a side
-    without disturbing anything already assigned". It does not: assignment is by
-    position within a hash-sorted stratum, so any addition moves the cut point.
-    Verified — adding 8 questions moved two existing ones from test to dev. The
-    evaluation set therefore cannot currently be extended without invalidating
-    every previously reported figure, which blocks fixing limitations 11 and the
-    refusal-resolution gap below. `docs/FINDINGS.md` F-11.
+14. **The dev/test split was not stable when questions were added — fixed, and
+    the fix moved the split once.** `bench/split.py` promised that "adding a
+    question later assigns it to a side without disturbing anything already
+    assigned"; it assigned by *position* within a hash-sorted stratum, so any
+    addition moved the cut point. Verified by adding 8 questions, which moved
+    two existing ones from test to dev.
+
+    Assignment is now by hash *threshold*, so a question's side depends only on
+    its own id. Correcting it necessarily reshuffled once: `oos-04` and `oos-05`
+    moved to dev, and test went from 37 questions to 32. **Both splits were
+    re-measured and the percentages did not move** — test 100% coverage and 100%
+    refusal on 28 and 4 questions rather than 31 and 6; dev 96.7% → 97.0%. The
+    figures in §6.0 are the post-fix ones.
+
+    The cost is that stratum balance is now approximate rather than exact, which
+    at these sizes is the right trade for a guarantee that holds. `docs/FINDINGS.md` F-11.
 15. **Refusal has no resolution on the dev split.** Three out-of-scope questions
     means refusal moves in 33-point steps and reads 100% at every floor from
     0.20 to 0.86. No threshold work can be validated against it, and the two

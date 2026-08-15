@@ -10,20 +10,18 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | **F-11** split instability | blocks F-09, F-10 and any eval-set growth; silently invalidates published figures |
-| **2** | **F-01** control advice unretrieved | the main remaining quality gap; three fixes already ruled out |
-| **3** | **F-13** `bge-base` embedder | the one lever attacking the *cause* behind F-01, §6.2 and §6.8 |
-| **4** | **F-04** off-crop documents | consumes the slots F-01 needs |
-| 5 | F-09 refusal resolution | blocked on F-11 |
-| 6 | F-05 `oos-09` refused by luck | same fragility that broke `oos-07`/`oos-08` |
-| 7 | F-02 two questions retrieve nothing | overlaps F-01/F-13 |
-| 8 | F-12 mmap | +0.13 points; ride the next re-index |
-| 9 | F-06 score/order mismatch | one comment |
-| — | F-03, F-07, F-08 | resolved or disclosure-only, see below |
+| **1** | F-09 refusal resolution | **unblocked** by F-11; dev has 5 out-of-scope, still thin |
+| **2** | **F-01 / F-13** | **probed — both have a low ceiling; see below before spending time** |
+| 3 | F-05 `oos-09` refused by luck | same fragility that broke `oos-07`/`oos-08` |
+| 4 | F-02 two questions retrieve nothing | overlaps F-01/F-13 |
+| 5 | F-12 mmap | +0.13 points; ride the next re-index |
+| 6 | F-06 score/order mismatch | one comment |
+| — | F-03, F-07, F-08, **F-04**, **F-11** | resolved or disclosure-only, see below |
 
 **Closed since this file was written:** the Q4_0 quantisation swap (shipped —
-§3.3b), the sweep range (now derived from observed scores — §6.2), and the
-answer-level metric (`make answers` — §6.9).
+§3.3b), the sweep range (now derived from observed scores — §6.2), the
+answer-level metric (`make answers` — §6.9), **F-11** split instability, and
+**F-04** off-crop retrieval.
 
 ---
 
@@ -74,8 +72,41 @@ directions not yet tried:
   — it appears in the ACMV page but not in the IPM guide chunks that dominate
   retrieval, which is a corpus problem rather than a retrieval one.
 
-The last is worth checking first and is cheap: count how many cassava chunks
-carry that guidance at all.
+**PROBED. Both probes ran; neither gives a green light.**
+
+*Probe 1 — is it in the corpus?* Yes. **90 cassava chunks (2.6%)** carry control
+phrasing: `resistant variety` 27, `tolerant variety` 20, `certified` 16,
+`disease-free` 15, `clean planting material` 11, `select cuttings` 5, `healthy
+cuttings` 4. Crucially `healthy cuttings` sits inside *Disease control in
+cassava farms: IPM field guide* — the document already supplying four of the top
+six passages.
+
+**So this is a WITHIN-DOCUMENT ranking problem, not a document-selection one.**
+The right document is retrieved; the wrong chunks of it win. That is a narrower
+and more tractable framing than "retrieval cannot find the guidance".
+
+*Probe 2 — does a better embedder fix it?* Partly, and not enough to justify
+itself:
+
+| | control chunks in top 6 of the pool | gap, best incumbent − best control |
+|---|---|---|
+| bge-small (current) | **0/6** | +0.065 |
+| bge-base | **1/6** | **+0.023** |
+
+`bge-base` closes ~two-thirds of the gap and pulls in one control chunk, for
+−0.4 final points of `S_eff` and a 3–4 hour re-index. Whether one chunk in six
+changes the answer is unknown.
+
+**What both probes show together.** Even with a materially stronger encoder,
+symptom chunks still outrank control chunks — because the *query* is
+symptom-shaped, not because the embedder is weak. The bottleneck is that one
+query vector cannot rank two kinds of content, which is precisely what
+dual-intent tried to fix and what failed twice on displacement.
+
+**Assessment: low ceiling, deprioritise.** The gap is small (0.02–0.065), so
+score-weighted fusion could plausibly flip it — but the three rejected attempts
+each looked plausible in advance too, and the payoff lands on the unquantified
+panel half of `S_acc` rather than on any term in the formula.
 
 **Unaffected by the Q4_0 swap.** Retrieval does not depend on the quantisation,
 and the measurements above were re-confirmed on the shipped configuration:
@@ -116,11 +147,43 @@ would distinguish a real generation problem from sampling noise. Not worth
 chasing at n=1.
 
 ### F-04 · Off-crop documents rank inside the top 6
-**Severity: medium.** *Guide for sustainable maize production in Ghana* and
-*Maize Seed Production* have both appeared in the top 6 for an explicitly
-cassava question. They consume slots that control advice needs (see F-01).
-A crop filter or down-weighting is the obvious approach; the query already names
-the crop and `scope.py` already detects crops.
+**Severity: medium — FIXED. Free, but not measurably beneficial either.**
+
+Measured across all questions naming an in-scope crop: **18 of 250 retrieved
+slots (7.2%) went to a passage about a different crop**, affecting 11 questions —
+maize seed production for a cassava question, rice for tomato, groundnut for
+pepper.
+
+`agbe/rag/index.py: _demote_off_crop()` moves those candidates to the back of
+the fused queue *before* `top_k` is taken. After: **0 of 250**.
+
+**Three design points worth keeping:**
+
+1. **Demotion, not exclusion.** Off-crop passages still fill slots if on-crop
+   ones run out, so this can never *reduce* the evidence the model gets.
+2. **Three categories, not two.** A passage naming *no* in-scope crop — general
+   disease principles, storage practice, generic whitefly biology — is NEUTRAL
+   and never demoted. Forced by `crop-23`: its Whiteflies document names cassava
+   and not tomato, but it is the same insect and the right answer.
+3. **The partition must happen before selection.** The first version demoted
+   *after* `top_k` was taken, which reordered the same six passages and changed
+   nothing — the off-crop rate stayed at 18/250 and looked like a working fix.
+
+**A/B on the same split, F-04 the only variable:**
+
+| | F-04 on | F-04 off |
+|---|---|---|
+| Answer accuracy | 87.9% (29/33) | 87.9% (29/33) |
+| `OK`/`NOT_USED`/`MISSED`/`UNGROUNDED` | 29/2/2/0 | 29/2/2/0 |
+
+**Identical.** Coverage and refusal also unchanged on both splits. So the change
+is free and it is not an improvement any current metric can see. It ships on
+correctness grounds — a maize seed-production page has no business in a cassava
+question's top six, and a judge reading the citations would notice — not on a
+measured gain.
+
+It did not help F-01 either: `clean planting material` is still 0. The freed
+slots went to other on-crop symptom passages, not to control advice.
 
 ### F-05 · `oos-09` is refused by luck
 **Severity: medium.** *"How do I fix my motorcycle engine?"* is refused only
@@ -226,7 +289,7 @@ figure is **guaranteed by construction** and is not a held-out measurement.
 report rather than quietly enjoyed.
 
 ### F-11 · The dev/test split is not stable when questions are added
-**Severity: high — it silently invalidates published numbers, and it blocks F-09.**
+**Severity: high — RESOLVED. Fixed, and the fix reshuffled the split once.**
 
 `bench/split.py` documents a guarantee it does not keep:
 
@@ -256,9 +319,24 @@ the one operation the docstring says is safe.
 construction. The cost is that strata are balanced only approximately rather
 than exactly, which at these sizes is a fair trade for a guarantee that holds.
 
-**Consequence until fixed:** the evaluation set cannot be extended without
-invalidating every previously reported dev and test figure, so F-09 and F-10
-are both blocked on this.
+**Fixed.** Assignment is now by hash threshold —
+`dev if _bucket(q["id"]) < DEV_FRACTION else test` — so a question's side
+depends only on its own id and cannot be moved by any other question.
+
+**Correcting it reshuffled the split once, unavoidably.** `oos-04` and `oos-05`
+moved to dev; test went from 37 questions to 32. Both splits were re-measured
+and **the percentages did not move**: test 100% coverage and 100% refusal (on
+28 and 4 questions rather than 31 and 6), dev 96.7% → 97.0%. §6.0 now quotes
+the post-fix figures.
+
+Two side effects worth knowing. Dev gained out-of-scope questions, 3 → 5, which
+partially addresses F-09 without adding anything. Test lost two, 6 → 4, so the
+held-out refusal figure now rests on four questions — thinner, and an argument
+for adding more once the set can be extended, which it now can.
+
+The cost of the fix is that stratum balance is approximate rather than exact.
+Stratification still prevents an area landing entirely on one side; it no longer
+guarantees `round(n * 0.5)` per stratum.
 
 ### F-09 · Refusal has no resolution on dev
 **Severity: medium.** Dev holds 3 out-of-scope questions, so refusal moves in

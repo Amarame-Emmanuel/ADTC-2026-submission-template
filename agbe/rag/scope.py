@@ -89,11 +89,32 @@ _DOSAGE_QUESTION = re.compile(
     re.IGNORECASE,
 )
 
+#: NAMED ACTIVES, not just categories.
+#:
+#: The category list below catches "how much antibiotic" and misses "how many ml
+#: of ivermectin does a 200 kg cow need?" - a farmer who knows the product name
+#: asks for it by name, which is the more likely phrasing, not the less. That
+#: question reached retrieval, cleared the lexical floor tolerance at 0.65 and
+#: was answered, until an evaluation question was written for it.
+#:
+#: These are the actives a smallholder in this region is most likely to name.
+#: The list is not exhaustive and cannot be - which is why the category terms
+#: stay as the backstop, and why the dosage refusal message tells the farmer to
+#: read the label and ask an extension officer rather than implying we know
+#: every product.
+_NAMED_ACTIVES = (
+    r"ivermectin|albendazole|levamisole|oxytetracycline|tetracycline|"
+    r"penicillin|amprolium|tylosin|closantel|praziquantel|"
+    r"glyphosate|paraquat|atrazine|mancozeb|chlorpyrifos|cypermethrin|"
+    r"lambda[- ]?cyhalothrin|imidacloprid|carbofuran|metalaxyl|"
+    r"emamectin|abamectin|deltamethrin|dimethoate|profenofos"
+)
+
 _SUBSTANCE = re.compile(
     r"\b(?:pesticide|insecticide|fungicide|herbicide|acaricide|nematicide|"
     r"chemical|spray|antibiotic|antibiotics|drug|medicine|dewormer|"
     r"anthelmintic|vaccine|injection|inject|dose|dosage|fertiliser|fertilizer|"
-    r"npk|urea)\b",
+    r"npk|urea|" + _NAMED_ACTIVES + r")\b",
     re.IGNORECASE,
 )
 
@@ -116,7 +137,7 @@ _SUBSTANCE = re.compile(
 # not on the topic.
 _LIVE_PRICE = re.compile(
     r"\b(?:what(?:'s| is) the (?:current |today'?s? )?price|"
-    r"how much (?:is|does|are|do)[^?]*(?:cost|sell|selling|go for)|"
+    r"how much (?:is|does|are|do)[^?]*(?:cost|sell|selling|go(?:ing)? for)|"
     r"price (?:of|for)[^?]*(?:today|now|currently|this week)|"
     r"(?:current|today'?s?|latest|market) price|"
     r"selling (?:for|at) (?:today|now)|"
@@ -124,12 +145,27 @@ _LIVE_PRICE = re.compile(
     re.IGNORECASE,
 )
 
+#: Asking us to predict the weather, in any phrasing.
+#:
+#: This used to enumerate ways of asking whether it WILL rain, and missed the
+#: ways of asking whether it will STOP. "Is the rain going to stop before I
+#: harvest next month?" scored 0.67, cleared the lexical floor tolerance and was
+#: answered - a farmer planning a harvest asks about the end of the rains at
+#: least as often as their start.
+#:
+#: The shape is now "prediction verb + weather noun + change verb" rather than a
+#: list of remembered sentences, which is what the category actually is.
 _LIVE_FORECAST = re.compile(
-    r"\b(?:will it rain|is it going to rain|when will (?:it|the rains?) "
-    r"(?:rain|come|start)|"
+    r"\b(?:"
+    r"(?:will|is|are|going to|gonna)[^?]{0,40}"
+    r"(?:rain|rains|raining|dry spell|harmattan|flood|drought)"
+    r"[^?]{0,40}(?:stop|start|come|end|continue|begin)|"
+    r"will it rain|is it going to rain|"
+    r"when will (?:it|the rains?) (?:rain|come|start|stop|end)|"
     r"(?:weather )?forecast|"
-    r"rain (?:next week|tomorrow|this week|today)|"
-    r"(?:next week|tomorrow)[^?]*rain)\b",
+    r"rain (?:next week|tomorrow|this week|today|next month)|"
+    r"(?:next week|tomorrow|next month)[^?]*rain"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -215,6 +251,19 @@ HUMAN_MEDICAL_MESSAGE = (
     "stop work, wash thoroughly, and go to a clinic or hospital now. Take the "
     "product container with you so they know what you were exposed to."
 )
+
+
+def crops_mentioned(text: str) -> set[str]:
+    """In-scope crops named in `text`.
+
+    Used by retrieval to tell three cases apart, which matters more than it
+    sounds: a passage about *another* crop, a passage about *this* crop, and a
+    passage about *no particular* crop. The third group - whitefly biology,
+    general disease principles, storage practice - is cross-cutting and must
+    not be treated as off-topic. See VectorIndex.hybrid_search.
+    """
+    low = text.lower()
+    return {c for c in IN_SCOPE_CROPS if re.search(rf"\b{re.escape(c)}s?\b", low)}
 
 
 def out_of_scope_crop(question: str) -> str | None:
