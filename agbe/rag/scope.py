@@ -230,6 +230,54 @@ FINANCIAL_LEGAL_MESSAGE = (
 )
 
 
+#: Mechanical repair. Two patterns, and BOTH must match.
+#:
+#: The domain is crops, livestock, weather and markets. Repairing a machine is
+#: none of them, and the corpus holds no repair manuals - so an answer would be
+#: invented. That applies whether or not the machine is agricultural: a water
+#: pump is farm equipment and fixing its engine is still not agronomy.
+#:
+#: WHY TWO PATTERNS AND NOT ONE
+#: ----------------------------
+#: Equipment alone must not trigger this. Sprayer calibration, knapsack
+#: maintenance and equipment storage are genuinely in extension literature and
+#: genuinely in scope - "how do I calibrate my sprayer" is a question this
+#: system should answer. What is out of scope is a MALFUNCTION: a thing that
+#: will not start, run or work.
+#:
+#: So a machine noun and a fault verb are both required, which is the narrowest
+#: rule that still catches the case.
+#:
+#: WHY A RULE RATHER THAN THE FLOOR
+#: --------------------------------
+#: Both evaluation questions in this category were refused only because nothing
+#: in an agriculture corpus resembles engine repair. That is luck, not policy,
+#: and it is the same shape as the two failures in 6.8 - a threshold masking a
+#: missing rule, holding until the corpus changed and then not.
+_MACHINE = re.compile(
+    r"\b(?:engine|motor|motorcycle|motorbike|okada|generator|genset|pump|"
+    r"tractor|tiller|mill|grinder|machine|machinery|gearbox|carburettor|"
+    r"carburetor|battery|alternator|spark plug)\b",
+    re.IGNORECASE,
+)
+
+_MECHANICAL_FAULT = re.compile(
+    r"\b(?:fix|repair|repairing|mend|service|servicing|overhaul|"
+    r"(?:will|would|does|do|is|are)\s*n[o']?t\s*(?:start|starting|run|running|"
+    r"work|working|turn|move)|broken|broke down|breaking down|stopped working|"
+    r"not starting|won'?t start|fault|faulty|leaking oil|smoking)\b",
+    re.IGNORECASE,
+)
+
+MECHANICAL_MESSAGE = (
+    "I cannot help with repairing machinery. My documents are agricultural "
+    "guidance - crops, livestock, weather and markets - and they contain no "
+    "repair instructions, so anything I said about your engine would be "
+    "guesswork. Please ask a mechanic. If your question is about using or "
+    "calibrating farm equipment rather than repairing it, ask me again that way."
+)
+
+
 @dataclass
 class ScopeVerdict:
     in_scope: bool
@@ -313,6 +361,9 @@ def check(question: str) -> ScopeVerdict:
 
     if _FINANCIAL_LEGAL.search(question):
         return ScopeVerdict(False, "financial or legal", FINANCIAL_LEGAL_MESSAGE)
+
+    if _MACHINE.search(question) and _MECHANICAL_FAULT.search(question):
+        return ScopeVerdict(False, "mechanical repair", MECHANICAL_MESSAGE)
 
     crop = out_of_scope_crop(question)
     if crop:

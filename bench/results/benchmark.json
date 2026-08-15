@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T08:01:01+00:00",
+  "generated_at": "2026-08-15T11:07:53+00:00",
   "host": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
     "machine": "x86_64",
@@ -18,7 +18,7 @@
     "n_threads": 4
   },
   "memory": {
-    "peak_rss_bytes": 1752694784,
+    "peak_rss_bytes": 1752473600,
     "peak_rss_gb": 1.632,
     "ceiling_gb": 7.0,
     "internal_target_gb": 5.0,
@@ -35,91 +35,91 @@
     "predicted_gb": 1.792
   },
   "latency": {
-    "ttft_p50_s": 21.295,
-    "ttft_p95_s": 24.06,
-    "ttft_mean_s": 20.514
+    "ttft_p50_s": 17.9,
+    "ttft_p95_s": 21.973,
+    "ttft_mean_s": 16.977
   },
   "throughput": {
-    "tokens_per_second_p50": 32.79,
-    "tokens_per_second_mean": 32.36,
-    "mean_prompt_tokens": 652,
+    "tokens_per_second_p50": 37.81,
+    "tokens_per_second_mean": 36.74,
+    "mean_prompt_tokens": 660,
     "mean_completion_tokens": 146
   },
   "workload": {
     "n_questions": 10,
     "n_answered": 10,
     "n_refused": 0,
-    "wall_clock_s": 269.5
+    "wall_clock_s": 225.1
   },
   "per_question": [
     {
       "question": "My cassava leaves are yellow and twisted and the plant is small. What is wrong?",
       "refused": false,
-      "ttft_s": 20.46,
-      "tokens_per_second": 34.69,
+      "ttft_s": 21.973,
+      "tokens_per_second": 38.49,
       "completion_tokens": 256
     },
     {
       "question": "How does cassava mosaic spread from one farm to another?",
       "refused": false,
-      "ttft_s": 17.523,
-      "tokens_per_second": 30.5,
+      "ttft_s": 16.753,
+      "tokens_per_second": 37.22,
       "completion_tokens": 54
     },
     {
       "question": "Where should I get cassava stems to plant so my crop does not get sick?",
       "refused": false,
-      "ttft_s": 19.191,
-      "tokens_per_second": 31.84,
+      "ttft_s": 15.963,
+      "tokens_per_second": 36.35,
       "completion_tokens": 90
     },
     {
       "question": "My cassava roots have brown rotten patches inside when I cut them",
       "refused": false,
-      "ttft_s": 21.295,
-      "tokens_per_second": 32.79,
+      "ttft_s": 17.9,
+      "tokens_per_second": 37.81,
       "completion_tokens": 137
     },
     {
       "question": "There are white cottony insects on the growing tip of my cassava",
       "refused": false,
-      "ttft_s": 19.051,
-      "tokens_per_second": 32.59,
+      "ttft_s": 16.004,
+      "tokens_per_second": 38.54,
       "completion_tokens": 138
     },
     {
       "question": "My cassava leaves have tiny yellow spots and look dusty underneath",
       "refused": false,
-      "ttft_s": 21.848,
-      "tokens_per_second": 32.88,
+      "ttft_s": 18.881,
+      "tokens_per_second": 37.82,
       "completion_tokens": 232
     },
     {
       "question": "Cassava leaves have angular brown spots and the stem is oozing",
       "refused": false,
-      "ttft_s": 23.749,
-      "tokens_per_second": 33.15,
+      "ttft_s": 19.294,
+      "tokens_per_second": 37.44,
       "completion_tokens": 216
     },
     {
       "question": "Should I remove the sick cassava plants from my field?",
       "refused": false,
-      "ttft_s": 24.06,
-      "tokens_per_second": 28.92,
+      "ttft_s": 19.792,
+      "tokens_per_second": 29.43,
       "completion_tokens": 28
     },
     {
       "question": "When should I weed my cassava farm?",
       "refused": false,
-      "ttft_s": 15.416,
-      "tokens_per_second": 35.37,
+      "ttft_s": 9.614,
+      "tokens_per_second": 39.78,
       "completion_tokens": 256
     },
     {
       "question": "How far apart should I plant cassava?",
       "refused": false,
-      "ttft_s": 22.543,
-      "tokens_per_second": 30.86,
+      "ttft_s": 13.591,
+      "tokens_per_second": 34.56,
       "completion_tokens": 55
     }
   ]

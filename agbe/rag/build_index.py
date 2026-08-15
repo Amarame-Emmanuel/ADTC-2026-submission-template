@@ -169,6 +169,30 @@ def main() -> int:
         print("\nno usable chunks produced")
         return 1
 
+    # Drop licence-excluded chunks HERE, before embedding.
+    #
+    # The same filter runs at load time in agbe/rag/index.py, and that one
+    # stays - it is the guarantee that the shipped system cannot retrieve from
+    # a NoDerivatives document whatever an old index on disk contains. But
+    # doing it *only* at load has two costs that build time avoids:
+    #
+    #   * `np.asarray(vectors)[keep]` materialises the whole memory-mapped
+    #     matrix into the heap to drop the rows, ~46 MB of peak RSS, directly
+    #     against the mmap the loader takes trouble to set up;
+    #   * we spend embedding time on passages that can never be retrieved -
+    #     2,640 of 43,177 chunks on the current corpus, about 7 minutes of a
+    #     two-hour build.
+    #
+    # Filtering at both ends is deliberate belt-and-braces, not duplication:
+    # this one saves the work, the loader's one keeps the promise.
+    from agbe.rag.licences import excluded
+
+    keep = [c for c in all_chunks if not excluded(c.licence)[0]]
+    if len(keep) != len(all_chunks):
+        print(f"\nlicence gate: dropped {len(all_chunks) - len(keep)} chunks "
+              f"from excluded-licence documents before embedding")
+        all_chunks = keep
+
     n_docs = len({c.doc_id for c in all_chunks})
     print(f"\n{len(all_chunks)} chunks from {n_docs} documents")
 

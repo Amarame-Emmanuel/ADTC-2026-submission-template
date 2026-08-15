@@ -63,7 +63,29 @@ LEXICAL_FLOOR_TOLERANCE = 0.05
 
 @dataclass
 class SearchHit:
-    """One retrieved passage and why it was retrieved."""
+    """One retrieved passage and why it was retrieved.
+
+    `score` AND `rank` COME FROM DIFFERENT RANKINGS. This is deliberate and it
+    surprises everyone who reads a result list for the first time, including
+    the author of this comment while debugging §6.8:
+
+        rank 1  score 0.688
+        rank 2  score 0.676
+        rank 3  score 0.728     <- higher score, lower rank
+
+    `rank` is position after reciprocal-rank fusion of the dense and lexical
+    rankings. `score` is the *dense cosine similarity alone*. A passage that
+    BM25 ranked first can therefore sit above one with a better dense score.
+
+    The reasoning is in `hybrid_search`: fusion decides what is retrieved, the
+    dense score decides whether it is good enough to use, because the refusal
+    floor is calibrated against cosine values and a fused rank is not
+    interpretable. Both are kept because both are needed.
+
+    The consequence for a reader: a printed result list is NOT monotonically
+    decreasing in the number beside it, and sorting by `score` gives a different
+    order than the system used.
+    """
 
     chunk: Chunk
     score: float
