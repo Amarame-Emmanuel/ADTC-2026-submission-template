@@ -63,6 +63,38 @@ from agbe.rag.safety import (
 # things in roughly half that. Rules 4 and 6 of the original are enforced in
 # code (agbe/rag/safety.py) rather than requested politely of a 3B model, so
 # spending prefill budget restating them bought nothing.
+#
+# A KNOWN DEFECT THIS PROMPT DOES NOT FIX, AND A REJECTED ATTEMPT
+# ---------------------------------------------------------------
+# Sources arrive as numbered blocks - "[1] title (year)", then text - and the
+# only formatting instruction is "cite them like [1]". The model mirrors that
+# structure: six sources in, six numbered paragraphs out, one summarising each.
+# Observed on two unrelated questions:
+#
+#   "should I sell my yam now or store it"  -> six blocks, four of them
+#       describing what a document contains rather than advising
+#   "my chickens have twisted necks"        -> six blocks, including a necropsy
+#       description of haemorrhages in the proventriculus and Peyer's patches
+#
+# Both were correct and neither was an answer. That defect is REAL and OPEN;
+# see docs/FINDINGS.md.
+#
+# Adding "write ONE answer, do not go through the sources one by one" and "skip
+# anything they cannot act on" fixed the shape completely - numbered blocks went
+# from six to zero on both questions - and cost 9 points of answer accuracy:
+#
+#     dev answer accuracy   93.9% -> 84.9%
+#     NOT_USED                  2 -> 5
+#
+# MISSED stayed at 0, so retrieval was unaffected. The model was still being
+# handed "mealybug", "striga" and "nitrogen deficiency" and was now leaving them
+# out of shorter, tidier answers. Permission to omit is permission to omit the
+# wrong thing, and in an architecture whose premise is that the corpus supplies
+# the agronomy, that is the wrong trade.
+#
+# A future attempt should change how sources are PRESENTED - six numbered blocks
+# is what invites six numbered blocks back - rather than instructing the model
+# to summarise less.
 SYSTEM_PROMPT = """You advise smallholder farmers in southwest Nigeria on crops \
 and livestock.
 
@@ -74,6 +106,38 @@ and livestock.
 
 The sources below were selected because they are relevant. Answer from them \
 directly. Do not begin by saying you lack information."""
+
+#: Questions whose answer depends on WHEN they are asked.
+#:
+#: The system has no clock. Nothing anywhere injects a date, a month, a season
+#: or a price - verified - so when a farmer asks "should I sell my yam now or
+#: store it?", the model has no idea whether "now" is harvest peak or the
+#: hungry season, and answers as though it does.
+#:
+#: §1 draws the line deliberately: store-or-sell *judgement* is in scope and
+#: answerable from extension material, while today's *price* is a fact we do
+#: not have. `scope.py` refuses the second and must keep answering the first.
+#: The gap is that the first was being answered as a directive rather than as
+#: the conditional advice it has to be.
+#:
+#: So the instruction below is appended only when a temporal marker appears.
+#: Every token in the system prompt is paid on every request, and most
+#: questions - "what is wrong with my cassava", "how do I store yam" - carry no
+#: timing dependence at all. Roughly 30 tokens on the questions that need it and
+#: none on the questions that do not.
+_TIME_DEPENDENT = re.compile(
+    r"\b(?:now|today|tonight|this (?:week|month|season)|right now|currently|"
+    r"at the moment|already|yet|these days|next (?:week|month|season))\b",
+    re.IGNORECASE,
+)
+
+TIME_UNAWARE_NOTE = (
+    "\n\nYou do not know today's date, the current season, or current prices. "
+    "This question depends on timing, so give the factors that decide it and "
+    "the usual seasonal pattern from the sources, and tell the farmer what to "
+    "check locally. Do not tell them what to do as though you knew the date."
+)
+
 
 #: Openings where the model disclaims having information and then answers anyway.
 #:
@@ -188,8 +252,15 @@ def build_prompt(
         blocks.append(f"[{i}] {hit.chunk.title} ({hit.chunk.year})\n{text}")
     sources = "\n\n".join(blocks)
 
+    # Only questions carrying a temporal marker pay for the note. See
+    # _TIME_DEPENDENT: the system has no clock, and answering "should I sell
+    # now" as a directive claims knowledge it does not have.
+    system = SYSTEM_PROMPT
+    if _TIME_DEPENDENT.search(question):
+        system += TIME_UNAWARE_NOTE
+
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {
             "role": "user",
             "content": f"Sources:\n\n{sources}\n\nFarmer's question: {question}",

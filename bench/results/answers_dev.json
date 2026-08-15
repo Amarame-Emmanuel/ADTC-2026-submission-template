@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-08-15T12:06:27+00:00",
+  "generated_at": "2026-08-15T14:19:48+00:00",
   "split": "dev",
   "n_in_scope": 33,
   "n_out_scope": 9,
-  "elapsed_s": 782.0,
+  "elapsed_s": 770.4,
   "answer_accuracy": 0.9394,
   "counts": {
     "OK": 31,
@@ -721,7 +721,7 @@
         "rot",
         "store"
       ],
-      "answer_head": "To reduce losses when storing yam before selling, consider using wood ash and lime wash on the damaged parts of tubers to reduce storage rots. Curing the tubers at 35-40\u00b0C at relative humidity of 40-100% for seven days a"
+      "answer_head": "To reduce losses when storing yam before selling, consider implementing the following practices: 1. **Storage Facilities**: Invest in a proper storage facility that can maintain a stable temperature and humidity. This wi"
     },
     {
       "id": "wthr-02",

@@ -1166,6 +1166,37 @@ irrigation to reduce whiteflies"*, neither in any source. A larger model fills
 gaps more fluently, which in an advisory system is a liability rather than a
 feature.
 
+**`UNGROUNDED: 0` is weaker evidence than it looks, and we know exactly how
+weak.** The check works by taking a question's `expect_any` terms and asking
+whether any appears in the answer but in no retrieved passage. That catches a
+fabricated *positive* claim about something the corpus does discuss. It cannot
+see a fabricated claim about something the corpus does **not** discuss, because
+there is no expected term to trip on.
+
+We found one by hand. Asked about Newcastle disease, the shipped model wrote:
+
+> *"However, there are no vaccines available for Newcastle disease in Nigeria."*
+
+`nigeria` appears **zero** times in the retrieved passages, as do `no vaccine`,
+`not available` and `unavailable`; the only vaccine sentence the model saw was
+*"prevention is best achieved through a vaccination programme tailored for local
+conditions"*. The claim is invented, it is false — I-2 and LaSota vaccines are
+the standard Newcastle control across West Africa — and it is harmful, because
+it could stop a farmer vaccinating.
+
+**This metric reported `UNGROUNDED: 0` on the configuration that produced it.**
+
+So the honest statement is: no answer in the dev split asserts an *expected*
+term without a source. That is worth measuring and it is not the same as "the
+system does not fabricate". A confident negative claim about something the
+sources simply do not cover is invisible here, and it is the shape most likely
+to mislead, because a farmer has no way to notice the absence.
+
+Recorded as `docs/FINDINGS.md` F-15. The instance was found by a human reading
+one answer, which is also how §6.8's chunk boundary and §6.10's questionnaire
+passages were found — three defects in this report that no metric in it
+detected.
+
 **What it does not fix.** It uses the same 70 short, direct questions, so §7.11's
 blind spot survives: the defect in §6.8 was found by *reading an answer*, not by
 any metric, and framed variants remain unwritten.
@@ -1350,6 +1381,17 @@ more than finding them hidden.
     §6.** Coverage measures retrieval; §6.9 measures the answer. The remaining
     3.1-point gap is two `NOT_USED` questions on the dev split — evidence was in
     the context and the model did not use it. `MISSED` is now 0 (§6.10).
+19. **`UNGROUNDED: 0` does not mean the system does not fabricate.** The check
+    only fires when an *expected* term appears without a source, so a confident
+    claim about something the corpus does not discuss is invisible to it. One
+    such claim — *"there are no vaccines available for Newcastle disease in
+    Nigeria"* — was found by hand on a configuration this metric scored 0
+    (§6.9). A claim-level check would close it and has not been built.
+20. **Answers are structured as source digests.** Six retrieved passages produce
+    six numbered paragraphs, one summarising each, rather than one answer.
+    Instructing the model to synthesise fixed the shape and cost 9 points of
+    answer accuracy, so it was rejected; the cause is how sources are presented,
+    not how the model is instructed. `docs/FINDINGS.md` F-14.
 14. **The dev/test split was not stable when questions were added — fixed, and
     the fix moved the split once.** `bench/split.py` promised that "adding a
     question later assigns it to a side without disturbing anything already
@@ -1403,12 +1445,36 @@ make fetch-corpus     # vetted documents + provenance manifest
 make index            # build retrieval index
 make coverage         # retrieval coverage + refusal accuracy (dev split)
 make coverage ARGS="--split test"    # the held-out figures quoted in §6.0
+make answers          # answer-level accuracy (§6.9), not just retrieval
+make submission       # build submission/model/ from the pinned weights
+make verify-submission # check the pin, the app and metadata.json agree
 make bench            # memory, latency, throughput
 make run              # serve at :8000 under the 7 GB cap
 ```
 
 Everything that touches a model runs inside the constrained container. Nothing is
 ever demoed or measured with more resources than the target laptop provides.
+
+**The submission bundle is generated, not assembled by hand.** It used to be
+copied manually, and it drifted the moment the model changed: `metadata.json`
+declared `GGUF Q4_0` and `model/qwen2.5-1.5b-instruct-q4_0.gguf` while the
+directory held `qwen2.5-1.5b-instruct-q4_k_m.gguf`. Those are precisely the two
+files whose 2.7× throughput difference §3.3b rests on, so a judge would have
+either failed to find the declared file or silently benchmarked away the entire
+`S_perf` case.
+
+That is the **fourth** time in this project that a hand-maintained copy has
+disagreed with its source — after the web UI's duplicated generation loop,
+`models.lock.json` pinning a model the application did not load, and the results
+table of §6.0 being transcribed rather than generated. The pattern is always two
+places holding one fact and only one of them being updated.
+
+`make submission` now builds the bundle from `models.lock.json` and verifies
+that the three places naming the model agree: the pin, `agbe/config.py`, and
+`submission/metadata.json`. `make verify-submission` checks without copying and
+exits non-zero on any disagreement, including a stale weights file left behind.
+A submission that describes a different model from the one it contains is worse
+than one that fails to build.
 
 **Content pinning.** Hugging Face repositories are mutable — a maintainer can
 reupload a requantised GGUF under the same filename. `models.lock.json` pins

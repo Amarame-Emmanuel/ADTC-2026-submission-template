@@ -10,7 +10,9 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
+| **1** | **F-15** fabricated claim, unmeasurable | a false vaccine claim; the grounding check cannot see this class |
+| **2** | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
+| 3 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
 | — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
 | — | F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
@@ -296,6 +298,84 @@ derived from §1's four advisory areas rather than from either question, and it
 generalises to phrasings invented afterwards — but the refusal figure for this
 category should be read as a consistency check, not as held-out evidence. Same
 caveat as F-08.
+
+### F-14 · The answer is a source digest, not an answer
+**Severity: high for the panel half of `S_acc` — OPEN. One fix measured and
+rejected.**
+
+Found by using the UI, not by any metric. Six sources in, six numbered
+paragraphs out, one summarising each:
+
+- *"Should I sell my yam now or store it?"* → four of six blocks described what
+  a document contains rather than advising.
+- *"My chickens have twisted necks and greenish diarrhoea"* → six blocks,
+  including a **necropsy description** (haemorrhages in the proventriculus,
+  Peyer's patches) and a sentence merging in **infectious bursal disease**,
+  which is a different illness.
+
+Both were factually defensible and neither was an answer. A farmer with dying
+birds needs to know Newcastle has no treatment and the flock must be separated
+today; the useful sentence was fourth.
+
+**Cause:** sources are presented to the model as numbered blocks — `[1] title
+(year)` then text — and the only formatting instruction is *"cite them like
+[1]"*. The model mirrors the input structure. Nothing asks it to write one
+answer.
+
+**Rejected fix — instructing it to synthesise.** Adding *"write ONE answer, do
+not go through the sources one by one"* and *"skip anything they cannot act
+on"* fixed the shape completely (numbered blocks 6 → 0 on both questions) and
+cost 9 points:
+
+| dev | before | with synthesis lines |
+|---|---|---|
+| Answer accuracy | **93.9%** | **84.9%** |
+| `NOT_USED` | 2 | **5** |
+| `MISSED` | 0 | 0 |
+
+`MISSED` stayed at 0, so retrieval was untouched — the model was still being
+handed `mealybug`, `striga` and `nitrogen deficiency` and was now omitting them
+from tidier answers. **Permission to omit is permission to omit the wrong
+thing.**
+
+**Where a future attempt should go:** change how sources are *presented*, not
+how the model is told to summarise. Six numbered blocks is what invites six
+numbered blocks back. Merging passages into continuous text with inline markers,
+or presenting fewer and longer passages, both attack the cause rather than
+asking the model to compensate for it.
+
+### F-15 · A fabricated claim no current check can catch
+**Severity: high — OPEN, and the measurement gap matters more than the instance.**
+
+Asked about Newcastle disease, the shipped model produced:
+
+> *"However, there are no vaccines available for Newcastle disease in Nigeria.
+> The best course of action is to isolate the affected birds…"*
+
+**Fabricated.** The word `nigeria` appears **zero** times in the retrieved
+passages, as do `no vaccine`, `not available` and `unavailable`. The only
+vaccine sentence the model saw was *"prevention is best achieved through a
+vaccination programme tailored for local conditions"*.
+
+It is also **false** — I-2 and LaSota vaccines are the standard Newcastle
+control across West Africa — and **harmful**, because it could stop a farmer
+vaccinating.
+
+**`bench/answers.py` reported `UNGROUNDED: 0` on the same configuration.** It
+detects ungroundedness by checking whether an *expected term* appears in the
+answer but in no retrieved passage. "Nigeria" is not an `expect_any` term for
+any question, so the check cannot see this class of fabrication at all: a
+*confident negative claim* about something the sources simply do not discuss.
+
+That is the finding. The instance was caught by a human reading one answer; the
+project's only automated grounding check is blind to it, and reporting
+`UNGROUNDED: 0` while this exists overstates what has been verified.
+
+**Directions:** a claim-level check (does each sentence's content appear in some
+source?) is the honest version and is expensive. A cheaper partial: flag
+absolute negative constructions — "there are no", "is not available", "cannot be
+obtained" — for review, since a corpus of guidance rarely asserts the
+non-existence of a control measure.
 
 ---
 

@@ -71,7 +71,7 @@ CONSTRAIN = --memory=$(MEM_LIMIT) --memory-swap=$(MEM_LIMIT) \
 MOUNTS = -v "$(CURDIR):/app"
 
 .PHONY: help build fetch-models convert-models fetch-corpus index run shell \
-        bench coverage answers test verify-no-torch clean
+        bench coverage answers test verify-no-torch submission verify-submission clean
 
 help:
 	@echo "Àgbẹ̀ - make targets"
@@ -198,6 +198,20 @@ bench:
 # from a development machine would not transfer to the target laptop anyway.
 thermal:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.thermal $(ARGS)
+
+# Assemble submission/model/ from the pinned weights, and verify that the three
+# places naming the model agree: models.lock.json, agbe/config.py and
+# submission/metadata.json.
+#
+# The bundle used to be filled by hand and drifted the moment the model changed
+# - it declared Q4_0 and contained Q4_K_M, which are exactly the two files whose
+# 2.7x throughput difference the S_perf case rests on. `verify-submission` is
+# the check; run it before packaging anything.
+submission:
+	python scripts/build_submission.py
+
+verify-submission:
+	python scripts/build_submission.py --check
 
 # Gate 1 screenshots, captured by driving the real UI in a real browser.
 #
