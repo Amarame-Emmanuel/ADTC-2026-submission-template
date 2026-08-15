@@ -80,6 +80,65 @@ _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _HEADING = re.compile(r"^(?:[A-Z][^.!?]{2,70}:?)$")
 
 
+#: Headings that label a FIELD within an entry rather than naming a new
+#: subject. Extension guides are built from them: every disease entry carries
+#: "Damage symptoms:", "Other crops attacked:", "Control:".
+#:
+#: They are still good split points - the sections they open are coherent - but
+#: they must not be treated as the chunk's subject, because they do not name
+#: one. Splitting at "Damage symptoms:" and stopping there produced a chunk
+#: reading "The leaves of cassava plants with THE DISEASE are discolored with
+#: patches of...", whose antecedent - the "Cassava mosaic disease" heading -
+#: had stayed behind in the previous chunk.
+#:
+#: Every model tested (0.5B, 1.5B, 3B) then diagnosed the labelled disease from
+#: the neighbouring passage instead. Capability does not recover a name that is
+#: not in the context.
+_FIELD_LABEL = re.compile(
+    r"^(?:damage\s+symptoms?|crop\s+damage(?:\s+symptoms?)?|symptoms?|signs?|"
+    r"appearance|description|identification|introduction|remarks?|"
+    r"other\s+crops?(?:\s+attacked)?|host\s+plants?|biology|life\s+cycle|"
+    r"distribution|economic\s+importance|damage|control|management|"
+    r"prevention|what\s+to\s+do|treatment|recommendations?)\b\s*:?\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_field_label(line: str) -> bool:
+    return bool(_FIELD_LABEL.match(line.strip()))
+
+
+def _split_off_leading_heading(paragraphs: list[str]) -> list[str]:
+    """Isolate a heading that shares a paragraph with the text beneath it.
+
+    `_SPLIT` breaks *before* a heading line but not after it, so extension text
+    shaped as
+
+        Cassava mosaic disease\\n
+        Cassava mosaic disease is caused by a virus...
+
+    arrives as ONE paragraph. `looks_like_heading` is then handed a long
+    multi-line block, does not match, and the section subject is never
+    recorded - so a later chunk opening on "Damage symptoms:" inherits the page
+    title instead of the disease name.
+
+    Splitting the first line off when it looks like a heading is what makes the
+    heading visible to the logic that already knows what to do with it.
+    """
+    out: list[str] = []
+    for para in paragraphs:
+        if not para:
+            continue
+        head, sep, rest = para.strip().partition("\n")
+        if sep and looks_like_heading(head):
+            out.append(head)
+            if rest.strip():
+                out.append(rest)
+        else:
+            out.append(para)
+    return out
+
+
 def looks_like_heading(line: str) -> bool:
     line = line.strip()
     if not line or len(line) > 72:
@@ -184,6 +243,10 @@ def chunk_pages(
     chunks: list[Chunk] = []
     buf = ""
     buf_start_page = 1
+    #: The most recent heading that names a subject rather than labelling a
+    #: field. Carried into chunks that would otherwise open on "Damage
+    #: symptoms:" with no indication of whose symptoms they are.
+    section = ""
 
     def emit(text: str, end_page: int) -> None:
         # Prefix the document title to every chunk after the first.
@@ -198,8 +261,18 @@ def chunk_pages(
         # Skipped when the text already opens with the title, which is common
         # for a page's first chunk.
         body = text
+
+        # Carry the enclosing SECTION heading, for the same reason the title is
+        # carried: a chunk is retrieved alone and must say what it is about.
+        # A chunk opening "Damage symptoms: The leaves of cassava plants with
+        # the disease..." names no disease at all, and its antecedent lives in
+        # a different chunk. Prefixing "Cassava mosaic disease" restores the
+        # subject for both the embedder and the model.
+        if section and section.lower() not in text[:200].lower():
+            body = f"{section}\n{body}"
+
         if title and not text[:120].lower().startswith(title[:40].lower()):
-            body = f"{title}\n{text}"
+            body = f"{title}\n{body}"
 
         chunks.append(
             Chunk(
@@ -257,7 +330,7 @@ def chunk_pages(
         if not page_text.strip():
             continue
 
-        for para in _SPLIT.split(page_text):
+        for para in _split_off_leading_heading(_SPLIT.split(page_text)):
             para = para.strip()
             if not para:
                 continue
@@ -279,8 +352,14 @@ def chunk_pages(
             # the text, which `min_chars` already prevents - flush() drops
             # anything below it - so the size test was doing no work that
             # mattered and was suppressing the breaks that did.
-            if looks_like_heading(para) and len(buf.strip()) >= min_chars:
-                flush(page_no, carry_overlap=False)
+            if looks_like_heading(para):
+                if len(buf.strip()) >= min_chars:
+                    flush(page_no, carry_overlap=False)
+                # Update the subject AFTER flushing, so the chunk being closed
+                # keeps the heading it was written under rather than inheriting
+                # the one that ended it.
+                if not is_field_label(para):
+                    section = para.strip().rstrip(":")
 
             for piece in (
                 _split_long_paragraph(para, max_chars)

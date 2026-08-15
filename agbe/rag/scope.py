@@ -141,6 +141,59 @@ _HUMAN_MEDICAL = re.compile(
 )
 
 
+#: Financial, legal and administrative services. Outside all four advisory
+#: areas this system covers - crop, livestock, weather and market guidance -
+#: and outside what an agronomic corpus can answer.
+#:
+#: WHY THIS RULE EXISTS AND WHY IT DID NOT BEFORE
+#: ----------------------------------------------
+#: The corpus legitimately contains CGIAR and IFPRI material on rural credit,
+#: land tenure and farmer organisations, because those documents also carry
+#: agronomy. Nothing declined these questions on policy; they were refused only
+#: because no chunk happened to score above the similarity floor.
+#:
+#: That was never a guarantee, and it stopped being true. After re-chunking on
+#: section headings the corpus went from 31,682 to 43,177 smaller, more
+#: precisely labelled chunks, and passages headed "Access to credit" and "Land
+#: tenure" began clearing the floor. Test-split refusal fell from 100% to 66.7%
+#: - "Which bank gives the best loan to farmers in Oyo State?" and "How do I
+#: register my farmland title?" were both answered, from policy papers, about
+#: someone's money and someone's land.
+#:
+#: A threshold was masking a missing rule. Retrieval quality improved and the
+#: mask came off. The rule states the reason instead.
+#: Word boundaries are per-alternative, not global. A trailing \b on the whole
+#: group silently broke every prefix in it - "credit facilit" would not match
+#: "credit facility", and "register my farm" would not match "register my
+#: farmland", because the next character is a letter rather than a boundary.
+#: Both target questions slipped through the first version for that reason.
+#:
+#: The boundaries that remain are load-bearing in the other direction: `tax\b`
+#: is what stops this rule firing on "taxonomy", which appears throughout
+#: agronomic text.
+_FINANCIAL_LEGAL = re.compile(
+    r"\b(?:"
+    r"banks?\b|loans?\b|microfinance\b|collateral\b|mortgages?\b|"
+    r"credit facilit\w*|interest rates?\b|insurance premium\w*|"
+    r"land titles?\b|title deeds?\b|land registr\w*|farmland title\w*|"
+    r"deed of assignment\b|certificate of occupancy\b|"
+    r"register (?:my |the )?(?:farm|land)\w*|"
+    r"taxe?s?\b|levy\b|levies\b|"
+    r"subsidy applicat\w*|grant applicat\w*|"
+    r"cooperative registrat\w*|business registrat\w*|licence applicat\w*"
+    r")",
+    re.IGNORECASE,
+)
+
+FINANCIAL_LEGAL_MESSAGE = (
+    "I cannot advise on loans, land titles or registration. My documents are "
+    "agricultural guidance - crops, livestock, weather and markets - and "
+    "answering from them would mean guessing about your money or your land. "
+    "Please ask your bank, your local land registry, or your extension officer, "
+    "who can refer you."
+)
+
+
 @dataclass
 class ScopeVerdict:
     in_scope: bool
@@ -208,6 +261,9 @@ def check(question: str) -> ScopeVerdict:
 
     if _LIVE_FORECAST.search(question):
         return ScopeVerdict(False, "live forecast", LIVE_FORECAST_MESSAGE)
+
+    if _FINANCIAL_LEGAL.search(question):
+        return ScopeVerdict(False, "financial or legal", FINANCIAL_LEGAL_MESSAGE)
 
     crop = out_of_scope_crop(question)
     if crop:
