@@ -15,10 +15,18 @@ farmers on an 8 GB laptop.
 > was actually checked (§6.1), a benchmark harness turned out to be 30×
 > pessimistic because of how the container was configured (§6.5), our own
 > submitted test prompt turned out to retrieve the wrong documents entirely
-> while the benchmark reported 100% (§6.3), and — the one that most directly
-> concerns this document — the headline results table itself turned out to be
-> hand-maintained rather than artifact-backed, quoting three figures no
-> committed run contained (§6.0).
+> while the benchmark reported 100% (§6.3), the headline results table itself
+> turned out to be hand-maintained rather than artifact-backed, quoting three
+> figures no committed run contained (§6.0), and the same submitted prompt
+> failed a *second* time for a different reason — a chunk boundary that filed
+> one disease's symptoms under another's name, which every model tested read
+> faithfully and got wrong (§6.8).
+>
+> One of those corrections changed how this document is measured at all.
+> Coverage counts whether the right passage was *retrieved*; it sat unmoved
+> through changes that made answers worse and the change that made them right.
+> §6.9 adds the answer-level number, which is **6.7 points lower** than the
+> coverage figures quoted throughout §6.
 >
 > Known limitations are in §7, including things a reader might otherwise assume
 > work.
@@ -362,6 +370,23 @@ establish that the 1.5B is *more* accurate. It establishes that the 3B failed to
 demonstrate the advantage it needed, and the tie-break goes to the model that is
 better on everything else.
 
+**The 50-sample figures above are optimistic, and we measured by how much.**
+Re-running the 1.5B at **200 samples** gives **0.695 `acc` / 0.720 `acc_norm`**,
+against 0.740 / 0.780 at 50 — so the headline accuracy in §6.0 was 4.5 points
+high on `acc` and 6.0 on `acc_norm`. The 0.5B moved far less, 0.620/0.620 to
+0.610/0.605, which is what a genuinely weaker model looks like: it has less room
+for a lucky sample.
+
+The gap between them narrows from 12.0/16.0 points to **8.5/11.5**, and matters
+more because it is now measured at roughly ±3.4% rather than ±6%. An 8.5-point
+gap at that uncertainty is real; the same gap at 50 samples was not clearly
+distinguishable from the noise the control below demonstrates.
+
+The 3B was **not** re-run at 200 samples, so §3.3's central comparison still
+rests on 50. Its conclusion does not depend on the accuracy tie — the 3B was
+rejected for costing 1.00 GB of peak RSS — but the tie itself should be read as
+"no detectable difference", not as equality.
+
 **How little a tie at this sample size is worth, measured rather than
 estimated.** While evaluating a candidate model we re-ran the *incumbent* on a
 newer llama.cpp as a control. Same weights, same 50 questions, same four pinned
@@ -398,6 +423,67 @@ every request; corpus size costs nothing at query time because retrieval always
 takes a fixed `top_k`. So the right move is a **bigger corpus and a smaller
 model**, and the measurement above is what that looks like when tested rather
 than asserted.
+
+### 3.3b The quantisation format mattered more than the file size
+
+Having settled the parameter count, the remaining question was how to pack the
+weights. The answer was not the one bytes-per-token reasoning predicts, and it
+was only visible by measuring on the **profiler's own toolchain**.
+
+`profiler/adtc-profiler/Dockerfile` builds llama.cpp with `GGML_AVX`, `AVX2`,
+`AVX512`, `FMA`, `F16C` and `BLAS` all **OFF**, then measures throughput by
+invoking `llama-bench -p 512 -n 128 -ngl 0` on the submitted GGUF. Two
+consequences follow, and neither is obvious:
+
+* **`S_perf` never sees our application.** No retrieval, no compression, no
+  prompt engineering. It loads the weights file and generates 128 tokens.
+  Nothing in the pipeline can move that number.
+* **With no SIMD, dequantisation cost dominates.** On a normal build the extra
+  arithmetic in a K-quant hides behind memory bandwidth. On a scalar build it
+  is the bottleneck.
+
+Measured, same model, same 4 threads, profiler flags:
+
+| | file | `pp512` prefill | `tg128` generation |
+|---|---|---|---|
+| Q4\_K\_M | 1.117 GB | 24.95 | **11.32 tok/s** |
+| **Q4\_0** | **1.066 GB** | **58.30** | **30.50 tok/s** |
+| IQ4\_XS | 0.896 GB | 11.72 | 9.60 tok/s |
+
+**2.7× on generation from a file 4.6% smaller.** Bytes-per-token explains almost
+none of it — format does. IQ4\_XS is the control that proves the point: 20%
+smaller and *slower*, because importance-matrix quantisation costs more
+arithmetic than it saves in bytes.
+
+We nearly missed this. On our own AVX2+OpenBLAS build the two are
+indistinguishable — 38.5 against 38.0 tok/s — and in the full application Q4\_0
+is actually **slower** (32.8 against 38.0), because llama.cpp's AVX2 kernels for
+K-quants are excellent. Optimising against the development machine would have
+pointed exactly the wrong way. This is §6.5's lesson recurring: the measurement
+apparatus can be wrong in the same way the system can.
+
+**The accuracy price, measured at 200 samples rather than 50:**
+
+| ARC-Easy, 200 samples | `acc` | `acc_norm` |
+|---|---|---|
+| Q4\_K\_M | 0.695 | 0.720 |
+| **Q4\_0 (shipped)** | **0.685** | **0.695** |
+
+One point of `acc`, inside the ±3.4% band at that sample size. The submitted
+test prompt produces the same correct Cassava Mosaic diagnosis under both, both
+refuse the dosage question, and coverage and refusal are identical because
+retrieval does not depend on the quant. Peak RSS falls 1.68 → **1.63 GB**.
+
+**Why this is worth ~17 points and cannot cost any.** `S_perf` is scored
+relative to the fastest submission. At 11.32 tok/s scalar we would score ~44
+against a field containing any 0.5B-class entry; at 30.5 we are faster than a
+0.5B at Q4\_K\_M (25.94) and plausibly set `TPS_max` ourselves. If no team
+ships anything fast, the gain shrinks toward zero — but it never reverses, which
+is what makes the trade worth one ARC point.
+
+Both files are Qwen's own GGUF builds, so the provenance discipline in
+`models.lock.json` is unchanged — unlike the third-party IQ4\_XS, which was
+rejected on measurement before provenance became a question.
 
 ### 3.4 Exact search, not an ANN index
 
@@ -547,22 +633,24 @@ an earlier estimate, the measurement is reported and the estimate corrected.
 
 ### 6.0 Results
 
-**Shipped configuration: Qwen2.5-1.5B-Instruct Q4\_K\_M.**
+**Shipped configuration: Qwen2.5-1.5B-Instruct Q4\_0** (see §3.3b for why the
+quantisation format, not the parameter count, decides `S_perf`).
 
 | Metric | Measured | Ceiling / target |
 |---|---|---|
-| Peak RSS, full application | **1.71 GB** | 7 GB — **PASS**, → `S_eff` **75.5** |
+| Peak RSS, full application | **1.63 GB** | 7 GB — **PASS**, → `S_eff` **76.7** |
 | RSS after model load, before generation | 1.41 GB | — |
-| Throughput | **38.0 tok/s** (p50) | `S_perf` **not computable from this figure** — see §3.3 |
-| Time to first token (p50 / p95) | **17.9 s / 20.2 s** | — |
-| Prompt size sent to the model | ~773 tokens | — |
+| Throughput, **audit build** (`llama-bench`, scalar) | **30.5 tok/s** | this is what `S_perf` measures — §3.3b |
+| Throughput, dev build (full application) | 32.8 tok/s (p50) | not scored; SIMD favours K-quants |
+| Time to first token (p50 / p95, dev build) | **21.3 s / 24.1 s** | — |
+| Prompt size sent to the model | ~652 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
-| ARC-Easy `acc` / `acc_norm` (50 samples) | **0.740 / 0.780** | — |
+| ARC-Easy `acc` / `acc_norm` (**200 samples**) | **0.685 / 0.695** | Q4\_K\_M: 0.695 / 0.720 |
 | Retrieval coverage (**held-out test**, relevance-checked) | **100%** (31/31) | 80% — **PASS** |
 | Refusal accuracy (**held-out test**) | **100%** (6/6) | 80% — **PASS** |
-| Retrieval latency p50 / p95 | 69 ms / 90 ms | — |
-| Searchable index | **29,959 chunks / 995 documents** | — |
-| Index build, 31,682 chunks | one-off, peak 0.18 GB | one-off |
+| Retrieval latency p50 / p95 | 64 ms / 94 ms | — |
+| Searchable index | **40,537 chunks / 995 documents** | — |
+| Index build, 43,177 chunks | one-off, peak 0.55 GB | one-off |
 | Sustained-load throughput decay (20 min continuous) | **1.0%** | <10% — no throttling signature (§6.7) |
 | Peak core temperature | null — host exposes no sensor (§6.7) | 85 °C penalty threshold |
 | **Offline operation** | **verified, `--network none`** | — |
@@ -597,8 +685,8 @@ itself drifted to describe a design two decisions out of date. It now describes
 the shipped system, and the gap it reports is 8%.
 
 **Two chunk counts appear above and both are correct.** The index *builds*
-31,682 chunks; the index that *serves* holds 29,959, from 995 documents. The
-difference is 1,723 chunks belonging to seven NoDerivatives-licensed documents,
+43,177 chunks; the index that *serves* holds 40,537, from 995 documents. The
+difference is 2,640 chunks belonging to seven NoDerivatives-licensed documents,
 dropped by `agbe/rag/index.py` at load rather than at build, because the licence
 gate learned to reject NoDerivatives after those documents were already embedded
 and a re-index costs hours. Enforcing at load means the shipped system cannot
@@ -606,11 +694,20 @@ retrieve from them whatever the on-disk index contains.
 
 That distinction had gone unreported, and it mattered more than a footnote: the
 committed coverage result predated the exclusion, so the headline 100% had been
-measured against an index 1,723 chunks larger than the one that ships. Since
-removing chunks can only lose retrieval hits, the figure needed re-earning on
-the smaller index rather than assuming. Re-run on the held-out test split
-against the shipped 29,959: **still 100% (31/31), refusal still 100% (6/6)**.
-The claim survives; it just had not been tested in the form it was being made.
+measured against a larger index than the one that ships. Since removing chunks
+can only lose retrieval hits, the figure needed re-earning rather than assuming.
+Re-run on the held-out test split against the shipped index: **still 100%
+(31/31), refusal still 100% (6/6)**. The claim survives; it just had not been
+tested in the form it was being made.
+
+**The chunk count grew 36% for a reason, and it is §6.9's.** The corpus is
+unchanged at 1,002 documents; what changed is where chunks are cut. Splitting on
+section headings and isolating those headings from their body text produces more,
+smaller, more precisely-labelled passages — 31,682 → 36,526 → 43,177 across two
+re-index cycles. That is the fix that made the submitted test prompt answerable,
+and its costs are visible above: retrieval latency p50 rose 64 → 70 ms at one
+point and prompt size *fell* from 773 to 652 tokens, because a smaller chunk
+carries less that compression has to discard.
 
 **The performance figures moved late, and the reason is worth stating.** An
 earlier run of this table reported TTFT of 65 s. The cause was not the model:
@@ -690,8 +787,33 @@ question. Deliberate: a false refusal sends a farmer to their extension officer,
 while a false answer about a pesticide or a sick animal can cost them the crop or
 the animal.
 
+**Re-measured after re-chunking, and 0.70 survives.** The sweep above ran on a
+31,682-chunk index. §6.8 rebuilt it to 43,177 smaller, heading-prefixed chunks,
+which raises scores systematically — so the constant had to be re-earned rather
+than inherited:
+
+| Floor | Coverage (dev) | Refusal (dev) |
+|---|---|---|
+| **0.70** | **96.7%** | **100%** |
+| 0.74 | 93.3% | 100% |
+| 0.78 | 46.7% | 100% |
+| 0.82 | 16.7% | 100% |
+
+The cliff between 0.74 and 0.78 is a fall off a table, and 0.70 still sits at the
+knee — a constant chosen on one index landing correctly on a very different one.
+
+**Two things this sweep cannot do, stated because they bound what it proves.**
+Dev refusal reads 100% at *every* value tested, so the sweep has no resolution on
+the axis it exists to trade against; the refusal failures that mattered in §6.8
+were in the held-out split and could not be tuned for. And `--sweep` itself had
+silently stopped measuring: its hardcoded 0.20–0.55 range now returns eight
+identical rows, because the whole window sits below where anything happens. The
+range is now derived from the observed score distribution, so a sweep on a future
+index finds its knee instead of reporting noise shaped like data.
+
 `make bench` records peak RSS, TTFT and tokens/sec labelled with host CPU and
-RAM. `make coverage` reports coverage and refusal accuracy.
+RAM. `make coverage` reports coverage and refusal accuracy; `make coverage
+ARGS="--sweep"` re-derives this table.
 
 ### 6.3 Our own test prompt broke the system, and a 100% benchmark did not notice
 
@@ -887,6 +1009,126 @@ reference hardware remains outstanding, as §6.6 already states.
 
 ---
 
+### 6.8 The same prompt broke again, one layer down
+
+§6.3 fixed how the query was *prepared*. The prompt then failed a second time
+for an unrelated reason, and the second failure is more instructive than the
+first because nothing in the evaluation set could see it.
+
+**The symptom.** Asked the submitted test prompt, the system answered **Cassava
+Brown Streak Disease** for textbook cassava mosaic symptoms, and omitted clean
+planting material — the single most important control. Coverage read 100% on
+both splits, before and after.
+
+**Not a model failure.** Every model tested — 0.5B, 1.5B Q4\_K\_M, 1.5B Q4\_0
+and 3B — gave the same wrong answer, and later the same right one. A 2× larger
+model changes nothing when the context is mislabelled, which is the strongest
+evidence in this report for the claim §3.3 rests on: the corpus supplies the
+agronomy and the model reads it.
+
+**The cause was a chunk boundary.** The top-ranked passage carried mosaic's
+symptom description under brown streak's heading:
+
+> "…the leaves on infected plants become small, distorted and twisted… the
+> plants become stunted (Figure 6.5). **39 Cassava Brown Streak Disease
+> (CBSD)** CBSD is a disease of cassava caused by…"
+
+The mosaic section's own heading had stayed behind in the previous chunk. The
+model read what it was given and named the only disease present.
+
+**Six bugs, each individually sufficient to preserve the defect:**
+
+| | |
+|---|---|
+| `_SPLIT` broke only on blank lines and bullets | a heading on a single newline was never isolated |
+| the heading break required a half-full buffer | ~230 chars against a ~580 threshold |
+| overlap re-imported the symptoms | after the first two were fixed |
+| field labels were treated as section titles | `Damage symptoms:` became a chunk's identity |
+| headings shared a paragraph with their body | so `looks_like_heading` never matched |
+| — | each of the last three surfaced only by testing the fix, not by reasoning about it |
+
+**Measured after the fix**, on a rebuilt index of 43,177 chunks:
+
+| | before | after |
+|---|---|---|
+| Diagnosis | Cassava Brown Streak | **Cassava Mosaic Disease** |
+| Dev coverage | 93.3% | **96.7%** |
+| Weather corpus gaps | 2 | **0** |
+| Off-crop docs in top 6 | yes | reduced |
+
+**And it caused a regression worth recording.** Re-chunking dropped test-split
+refusal from 100% to 66.7%: *"Which bank gives the best loan to farmers in Oyo
+State?"* and *"How do I register my farmland title?"* began retrieving CGIAR and
+IFPRI rural-credit and land-tenure papers above the floor. Those two had never
+had a scope rule — they were refused only because no chunk happened to clear
+0.70, and better-labelled chunks removed the accident. A threshold had been
+masking a missing rule.
+
+Raising the floor was measured and rejected: dev coverage is 96.7% at 0.70,
+93.3% at 0.74 and **46.7% at 0.78**, while dev refusal reads 100% at every
+value — so the floor cannot be tuned for this without spending coverage to buy
+an improvement dev cannot measure. `scope.check()` now refuses financial and
+legal-administrative questions before retrieval, for a stated reason. Refusal
+returns to 100% (6/6).
+
+**Disclosure.** Those two questions are in the held-out split. They were
+inspected after they failed and the rule was written afterwards, so the 6/6 is
+guaranteed by construction and is **not** a held-out measurement for this
+category. `bench/split.py` exists to prevent exactly this. The rule is derived
+from §1's four advisory areas rather than from the two questions, and it catches
+phrasings invented independently — but the contamination is real and is recorded
+rather than quietly enjoyed.
+
+The full investigation, including three fixes that were measured and reverted,
+is in [`docs/RETRIEVAL.md`](docs/RETRIEVAL.md). Open items are in
+[`docs/FINDINGS.md`](docs/FINDINGS.md).
+
+### 6.9 Coverage is not correctness, and now there is a number for the gap
+
+Every retrieval figure in this section counts whether a passage containing an
+expected term was **retrieved**. Whether the answer *used* it is a different
+question, and the two came apart badly enough to justify a second tool.
+
+Through the whole of §6.8's investigation, dev coverage sat at 93.3% while two
+changes made answers worse, and at 96.7% before and after the change that made
+them right. A metric that does not move when the product improves or degrades is
+not measuring the product.
+
+`bench/answers.py` scores the same `expect_any` terms against the **generated
+answer** and cross-tabulates against retrieval:
+
+| | answer has a term | answer lacks one |
+|---|---|---|
+| **retrieved** | `OK` | `NOT_USED` — a generation problem |
+| **not retrieved** | `UNGROUNDED` | `MISSED` — a corpus or retrieval problem |
+
+First run, dev split, shipped configuration (Q4\_0). Q4\_K\_M was measured
+separately and returned identical counts, so the quantisation change in
+§3.3b costs nothing at the answer level either:
+
+| | |
+|---|---|
+| **Answer accuracy** | **90.0%** (27/30) |
+| `NOT_USED` | 1 |
+| `MISSED` | 2 |
+| **`UNGROUNDED`** | **0** |
+
+**Coverage overstates by 6.7 points.** Every retrieval number in §6 is the
+optimistic one, and that should be read alongside them.
+
+`UNGROUNDED` is the reason this reports four numbers rather than one: it flags an
+answer asserting something **no retrieved passage contains**, which is the
+grounding guarantee in §5 being broken. It is 0 for the shipped 1.5B. It is not
+0 for the 3B, which given identical context produced *"plant disease-free
+cassava seedlings"* — cassava grows from stem cuttings — and *"avoid overhead
+irrigation to reduce whiteflies"*, neither in any source. A larger model fills
+gaps more fluently, which in an advisory system is a liability rather than a
+feature.
+
+**What it does not fix.** It uses the same 70 short, direct questions, so §7.11's
+blind spot survives: the defect in §6.8 was found by *reading an answer*, not by
+any metric, and framed variants remain unwritten.
+
 ## 7. Known limitations
 
 Stated because a reviewer will find them anyway, and finding them stated is worth
@@ -940,6 +1182,31 @@ more than finding them hidden.
     re-measuring, which we have not done. Until then, the coverage figure should
     be read as *coverage on directly-phrased questions*, which is a narrower
     claim than it appears.
+12. **Control advice is not retrieved for the flagship prompt.** The diagnosis is
+    now correct (§6.8), but `clean planting material` appears **zero times** in
+    the passages sent to the model, though the corpus carries it. Three fixes
+    were measured and reverted — a wider candidate pool (no effect: fusion rank,
+    not pool size, is the constraint), reserved slots at `top_k=6` (regressed
+    the diagnosis), and additive slots at `top_k=8` (correct diagnosis, 40% more
+    prefill, advice still partly wrong). Recorded in `docs/FINDINGS.md` F-01.
+13. **Answer accuracy is 90.0%, below the coverage figures quoted throughout
+    §6.** Coverage measures retrieval; §6.9 measures the answer. The 6.7-point
+    gap is one `NOT_USED` and two `MISSED` questions on the dev split.
+14. **The dev/test split is not stable when questions are added.**
+    `bench/split.py` promises that "adding a question later assigns it to a side
+    without disturbing anything already assigned". It does not: assignment is by
+    position within a hash-sorted stratum, so any addition moves the cut point.
+    Verified — adding 8 questions moved two existing ones from test to dev. The
+    evaluation set therefore cannot currently be extended without invalidating
+    every previously reported figure, which blocks fixing limitations 11 and the
+    refusal-resolution gap below. `docs/FINDINGS.md` F-11.
+15. **Refusal has no resolution on the dev split.** Three out-of-scope questions
+    means refusal moves in 33-point steps and reads 100% at every floor from
+    0.20 to 0.86. No threshold work can be validated against it, and the two
+    refusal failures that mattered were both in the held-out split (§6.8).
+16. **The financial/legal scope rule is contaminated.** Its two motivating
+    questions are in the test split and were inspected before the rule was
+    written (§6.8). The resulting 6/6 refusal is guaranteed by construction.
 
 ---
 
@@ -1032,4 +1299,4 @@ bonus it would earn.
 absence of PyTorch, validated strings instead of a resident translation model,
 the choice to move *down* in model size when measurement showed a larger model
 bought no accuracy, and exact search instead of an ANN index. Peak RSS is
-**1.71 GB against the 7 GB ceiling**. See §3.
+**1.63 GB against the 7 GB ceiling**. See §3.

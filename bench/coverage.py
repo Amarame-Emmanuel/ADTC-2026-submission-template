@@ -66,6 +66,41 @@ def load_questions(split: str = "dev") -> list[dict]:
     return parts[split]
 
 
+def sweep_floors(split: str, n: int = 9) -> list[float]:
+    """Floors to sweep, spanning the scores this index actually produces.
+
+    Retrieves once per question with the floor removed, collects the top score
+    for each, and spreads the sweep across that distribution's 10th-90th
+    percentile. The knee is necessarily inside the range of observed scores, so
+    deriving the window from them means the sweep keeps finding it however the
+    embedder, the chunker or the corpus change underneath.
+    """
+    import numpy as np
+
+    questions = load_questions(split)
+    index = VectorIndex.load()
+    embedder = Embedder()
+
+    tops: list[float] = []
+    for q in questions:
+        hits = index.hybrid_search(
+            q["question"], embedder.embed_query(q["question"]),
+            top_k=1, min_score=0.0,
+        )
+        if hits:
+            tops.append(float(hits[0].score))
+
+    if not tops:
+        return [round(0.20 + 0.05 * i, 2) for i in range(n)]
+
+    lo = float(np.percentile(tops, 10))
+    hi = float(np.percentile(tops, 90))
+    if hi - lo < 0.02:          # degenerate spread; widen so the sweep still moves
+        lo, hi = lo - 0.05, hi + 0.05
+    step = (hi - lo) / (n - 1)
+    return [round(lo + step * i, 2) for i in range(n)]
+
+
 def machine_label() -> dict:
     """Identify the machine, so results from different hosts stay comparable.
 
@@ -297,9 +332,23 @@ def main() -> int:
         return 2
 
     if args.sweep:
+        # The range is DERIVED, not hardcoded.
+        #
+        # It used to be a fixed 0.20-0.55, chosen when scores lived there. After
+        # re-chunking on section headings the same eight rows returned identical
+        # numbers - coverage 93.3%, refusal 66.7%, every time - because the whole
+        # swept range now sits below where anything happens. The tool did not
+        # fail; it printed eight rows of noise shaped like data, and REPORT.md
+        # 6.2 quotes a table produced by it.
+        #
+        # A sweep whose window is fixed while the index moves is a sweep that
+        # silently stops measuring. So the window is taken from the scores the
+        # index actually produces for these questions: the knee is always inside
+        # the observed distribution, wherever that distribution has drifted to.
+        floors = sweep_floors(args.split)
         print(f"{'min_score':>10} {'coverage':>10} {'refusal':>10}   "
-              f"(split={args.split})")
-        for floor in [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55]:
+              f"(split={args.split}, range derived from observed scores)")
+        for floor in floors:
             r = evaluate(floor, args.top_k, split=args.split)
             print(f"{floor:>10.2f} {r['coverage']['value']:>9.1%} "
                   f"{r['refusal']['value']:>10.1%}")

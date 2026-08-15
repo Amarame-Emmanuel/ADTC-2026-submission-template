@@ -71,7 +71,7 @@ CONSTRAIN = --memory=$(MEM_LIMIT) --memory-swap=$(MEM_LIMIT) \
 MOUNTS = -v "$(CURDIR):/app"
 
 .PHONY: help build fetch-models convert-models fetch-corpus index run shell \
-        bench coverage test verify-no-torch clean
+        bench coverage answers test verify-no-torch clean
 
 help:
 	@echo "Àgbẹ̀ - make targets"
@@ -223,6 +223,18 @@ screenshots:
 # similarity floor cannot be tuned to flatter one number alone.
 coverage:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.coverage --save $(ARGS)
+
+# Answer-level evaluation. `coverage` above measures whether the right passage
+# was RETRIEVED; this measures whether the ANSWER said the right thing, which is
+# not the same and came apart badly enough to need its own tool - coverage sat
+# unmoved through changes that made answers worse and the one that made them
+# right. See REPORT.md 6.9.
+#
+# Costs a generation per question (~20s against coverage's ~70ms), so it is
+# separate rather than a flag: coverage stays cheap enough to run constantly,
+# this runs when answers might have changed.
+answers:
+	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.answers --save $(ARGS)
 
 test:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m pytest tests/ -v

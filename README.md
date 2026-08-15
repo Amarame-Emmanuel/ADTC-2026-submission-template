@@ -42,7 +42,7 @@ Two disciplines, integrated end to end:
 | Stage | Discipline | Component |
 |---|---|---|
 | Passage retrieval | Information retrieval | bge-small-en-v1.5 · llama.cpp |
-| Grounded advisory | Language modelling | Qwen2.5-1.5B-Instruct Q4\_K\_M · llama.cpp |
+| Grounded advisory | Language modelling | Qwen2.5-1.5B-Instruct Q4\_0 · llama.cpp |
 
 Retrieval is the load-bearing pairing, not a supporting one: the corpus supplies the
 agronomy and the model only reads it. That is what makes a 1.5B model sufficient —
@@ -64,7 +64,7 @@ transitively.
 
 | | |
 |---|---|
-| **Measured peak RSS, full application** | **1.71 GB** |
+| **Measured peak RSS, full application** | **1.63 GB** |
 | Ceiling (disqualifying if exceeded) | 7.00 GB |
 | Internal target | 5.00 GB |
 
