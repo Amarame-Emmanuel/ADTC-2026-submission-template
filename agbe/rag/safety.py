@@ -78,6 +78,31 @@ HAZARDOUS_ACTIVES = {
     "mercuric chloride", "mercuric oxide", "phenylmercury acetate",
     "methyl bromide", "ethylene dibromide", "alachlor", "tributyltin",
     "brodifacoum", "warfarin", "nicotine", "flucythrinate",
+    # Restricted for CHRONIC harm, not acute toxicity.
+    #
+    # The list above screens on WHO Ia/Ib and Rotterdam Annex III - that is, on
+    # how quickly a compound kills an adult. That criterion has a hole, and the
+    # system fell into it: asked about cutworms it recommended "carbaryl or
+    # chlorpyrifos". Carbaryl was caught and the banned-pesticide warning fired
+    # correctly. Chlorpyrifos was not, because it is WHO Class II - moderately
+    # hazardous acutely - and by the stated criterion it belonged outside.
+    #
+    # Chlorpyrifos is banned across the EU and severely restricted in the US.
+    # The reason is developmental neurotoxicity in children, which acute
+    # toxicity class does not measure at all. Mancozeb is the same shape: WHO
+    # Class III, banned in the EU in 2021 as a suspected endocrine disruptor and
+    # reproductive toxicant.
+    #
+    # A screen that asks only "how fast does this kill" will keep missing the
+    # compounds withdrawn for what they do to children slowly. These are the
+    # ones a smallholder is most likely to be sold, precisely because their
+    # acute hazard class kept them on the shelf longest.
+    "chlorpyrifos", "chlorpyrifos-methyl", "mancozeb", "maneb", "zineb",
+    "thiram", "ziram", "propineb", "atrazine", "diuron", "linuron",
+    "chlorothalonil", "iprodione", "procymidone", "vinclozolin",
+    "carbendazim", "benomyl", "thiophanate-methyl", "fipronil",
+    "imidacloprid", "clothianidin", "thiamethoxam", "acetamiprid",
+    "dimethoate", "malathion", "profenofos", "quinalphos", "fenthion",
 }
 
 #: Dosage-shaped patterns. Deliberately broad: a false positive costs one

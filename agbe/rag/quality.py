@@ -66,6 +66,110 @@ MIN_REAL_WORD_SHARE = 0.72
 MAX_FRONT_MATTER_HITS = 2
 
 
+#: A figure or table caption. Bounded so it cannot swallow following prose:
+#: captions are short, and a runaway match would delete guidance.
+#: Bounded, and it must not require a terminator. The first version ended the
+#: match on `.` or a newline, and the caption that caused this bug has neither -
+#: extraction runs it straight into the running head:
+#:
+#:     Figure 15: Nymph of the variegated grasshopper 13 IPM Field Guide ...
+#:
+#: So the caption body is a tempered match: consume non-sentence-ending text but
+#: stop before a bare page number, which is where the caption actually ends.
+_CAPTION = re.compile(
+    r"\b(?:Fig(?:ure)?|Table|Plate|Photo)s?\s*\.?\s*\d+(?:\.\d+)?\s*[:.\-]?\s*"
+    r"(?:(?!\s\d{1,4}\s)[^.\n]){0,80}",
+    re.IGNORECASE,
+)
+
+#: A bare page number sitting between sentences, which is what a running head
+#: leaves behind once the title is removed.
+_PAGE_NUMBER = re.compile(r"(?:(?<=\.)|(?<=\n)|^)\s*\d{1,4}\s*(?=[A-Z\n]|$)")
+
+#: Web furniture. Much of the corpus is a website converted to text, and the
+#: navigation came with it.
+#:
+#: Asked what was cutting his seedlings, a farmer was told to consider
+#: solarising the seedbed and "for more information on solarization, refer to
+#: the link provided". There is no link. There was one on a web page that no
+#: longer exists in this form, and the cross-reference survived into an answer
+#: as an instruction to follow something that is not there.
+#:
+#: 2,520 chunks - 6.2% of the index - carry this: bare URLs, institutional
+#: footers, "click here", "read more". Same class as the figure captions in
+#: strip_furniture: page structure read as content.
+#:
+#: The URL patterns are unconditional - a bare domain carries no agronomy. The
+#: cross-reference phrases are stripped only as far as the phrase itself, never
+#: to the end of the sentence, because "for more information see your extension
+#: officer" is real advice and only the dangling half is furniture.
+_WEB_FURNITURE = re.compile(
+    r"https?://\S+|www\.\S+|"
+    r"\bclick here\b|\bread more\b|\bdownload (?:the|this)\b[^.\n]{0,40}|"
+    r"\b(?:see|follow|refer to|use) the link (?:provided|below|above)?|"
+    r"\bfor more information,?\s+(?:see|visit|go to|refer to)\s+the link\b|"
+    r"\b(?:see|visit) (?:the )?(?:website|web ?page|link)\b",
+    re.IGNORECASE,
+)
+
+
+def strip_furniture(text: str, title: str = "") -> str:
+    """Remove captions, running heads, page numbers and web furniture.
+
+    WHY THIS EXISTS - AND IT IS A SAFETY FIX, NOT A TIDINESS ONE
+    ------------------------------------------------------------
+    Asked about white cottony insects on cassava, the system advised
+
+        "using natural enemies like the variegated grasshopper"
+
+    *Zonocerus variegatus* is one of the most destructive PESTS of cassava in
+    West Africa. A farmer encouraging them would be inviting the insect that
+    defoliates their crop.
+
+    The model did not invent it. The passage it was given read:
+
+        Figure 15: Nymph of the variegated grasshopper
+        13 IPM Field Guide Pest Control in Cassava Farms
+        Spiraling whitefly  Appearance: Adults of the spiraling whitefly...
+
+    Three unrelated things fused: a caption belonging to the PREVIOUS section,
+    where the grasshopper is described as a pest; the running head; and the
+    start of the whitefly section. The grasshopper's name sat two lines above
+    whitefly control advice, and the model drew the obvious wrong inference.
+
+    This is §6.8's chunk-boundary defect in a third costume. Section headings
+    were fixed by chunking on them; captions and running heads are not headings,
+    survive chunking, and create the same false adjacency between an entity and
+    advice that has nothing to do with it.
+
+    WHY STRIP RATHER THAN REJECT
+    ----------------------------
+    The chunk also contained real whitefly guidance. `is_usable` rejects a whole
+    passage, which would have thrown that away. Furniture is removable without
+    touching the prose around it.
+
+    WHY AT RETRIEVAL RATHER THAN INDEXING
+    -------------------------------------
+    Same reason as the rest of this module: indexing is tidier and costs a
+    two-hour rebuild, retrieval costs microseconds and can be measured now. The
+    chunker should learn this too, on the next rebuild.
+    """
+    cleaned = _CAPTION.sub(" ", text)
+
+    # Running heads repeat the document title inside the body. The title is
+    # prefixed deliberately by the chunker (so a passage says what it is about);
+    # occurrences AFTER that first one are page furniture.
+    if title and len(title) > 12:
+        first = cleaned.find(title)
+        if first != -1:
+            head, tail = cleaned[: first + len(title)], cleaned[first + len(title):]
+            cleaned = head + tail.replace(title, " ")
+
+    cleaned = _WEB_FURNITURE.sub(" ", cleaned)
+    cleaned = _PAGE_NUMBER.sub(" ", cleaned)
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
+
 def real_word_share(text: str) -> float:
     """Fraction of alphabetic tokens that are three characters or longer.
 

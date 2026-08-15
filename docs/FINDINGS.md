@@ -10,12 +10,16 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | **F-15** fabricated claim, unmeasurable | a false vaccine claim; the grounding check cannot see this class |
-| **2** | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
-| 3 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
+| **1** | **F-18** symptom returned as instruction | *"cut off seedlings at the base every night"* — new class, no guard covers it |
+| **2** | **F-15** fabricated claim, unmeasurable | a false vaccine claim; the grounding check cannot see this class |
+| **3** | **F-17** one document takes every slot | cap built, measured, reverted — coherence beat coverage |
+| **4** | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
+| 5 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
+| 6 | **F-20** topic drift | cutworm question answered damping-off too |
+| 7 | **F-21** livestock species leak | aquaculture passages in goat and chicken answers |
 | — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
-| — | F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
+| — | **F-16**, **F-19**, **F-22**, F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
 
 **Closed since this file was written:** the Q4_0 quantisation swap (shipped —
 §3.3b), the sweep range (now derived from observed scores — §6.2), the
@@ -299,6 +303,105 @@ generalises to phrasings invented afterwards — but the refusal figure for this
 category should be read as a consistency check, not as held-out evidence. Same
 caveat as F-08.
 
+### F-16 · Figure captions and running heads create false adjacency
+**Severity: high — FIXED. This one produced actively dangerous advice.**
+
+Asked about white cottony insects on cassava, the system advised:
+
+> *"using natural enemies like **the variegated grasshopper**"*
+
+*Zonocerus variegatus* is one of the most destructive **pests** of cassava in
+West Africa. A farmer encouraging them would be inviting the insect that
+defoliates their crop.
+
+**The model did not invent it.** The passage it was handed read:
+
+```
+Figure 15: Nymph of the variegated grasshopper
+13 IPM Field Guide Pest Control in Cassava Farms
+Spiraling whitefly  Appearance: Adults of the spiraling whitefly...
+```
+
+Three unrelated things fused: a caption belonging to the **previous** section,
+where the grasshopper is described as a pest; the running head; and the start of
+the whitefly section. The grasshopper's name sat two lines above whitefly
+control advice and the model drew the obvious wrong inference.
+
+**This is §6.8's chunk-boundary defect in a third costume.** Section headings
+were fixed by chunking on them. Captions and running heads are not headings,
+survive chunking untouched, and create the same false adjacency between an
+entity and advice that has nothing to do with it.
+
+**Fix:** `quality.py: strip_furniture()`, applied after compression in
+`advisor.retrieve_and_compress`. Strips figure/table captions, repeated document
+titles (running heads) and bare page numbers.
+
+Two design points:
+
+- **Strip, do not reject.** The chunk also held real whitefly guidance;
+  `is_usable` rejects whole passages and would have discarded it.
+- **The caption pattern must not require a terminator.** The first version ended
+  the match on `.` or newline, and this caption has neither — extraction runs it
+  straight into the running head. It matched nothing, and the "fix" was inert
+  until tested. The body is now a tempered match that stops before a bare page
+  number.
+
+Verified: `variegated grasshopper` 0, `figure` 0, whitefly guidance retained,
+ordinary prose unchanged, 142 tests pass.
+
+### F-17 · One document can take every retrieval slot
+**Severity: medium — OPEN. A per-document cap was built, measured and REVERTED,
+and the reason is the most useful thing learned today.**
+
+The same question retrieved **six passages from one document** (*Pest control in
+cassava farms*), and within them whitefly content outnumbers mealybug **8:4** —
+even though the sign lexicon correctly put `mealybug` in the query and mealybug
+passages *were* retrieved. The model followed the majority and answered about
+the wrong pest.
+
+This is why `crop-05` shows as `NOT_USED` in the answer-level evaluation: the
+evidence is present and outvoted.
+
+`_demote_off_crop` prevents another *crop* taking slots; nothing prevents one
+*document*, or one pest within a document, taking all of them.
+
+**The cap worked exactly as designed and made the answer worse.**
+`MAX_PER_DOCUMENT = 2`, with over-limit passages deferred and backfilled so a
+thin topic never lost evidence. Retrieval improved on the measure it targeted:
+
+| cassava mealybug question | before | with cap |
+|---|---|---|
+| passages / documents | 6 / **1** | 6 / **5** |
+| mealybug : whitefly | 4 : 8 | **8 : 7** |
+| a dedicated *Mealybugs* document retrieved | no | **yes** |
+
+And the answer degraded badly. It still named the wrong pest, and added a new
+false claim repeated four times — *"the spiralling whitefly is a natural enemy
+of cassava pests"*, an inversion of the same kind as the grasshopper error — plus
+nonsense advice recycled from a document title (*"use a whitefly IPM Field
+Guide"*), and the six-block digest format returned.
+
+**The mechanism, and it generalises.** Before the cap the model had six passages
+from one coherent document and produced a wrong-but-coherent answer. After, it
+had fragments from five documents and produced an incoherent one with a
+fabrication. `natural enem` rose 1 → 3 in the context — mentions of natural
+enemies *of* pests — and the model attached the phrase to the whitefly itself.
+
+**More diverse sources gave a 1.5B model more disconnected fragments to
+confuse.** That is the opposite of what retrieval intuition predicts, and it is
+consistent with the synthesis-instruction failure (§6.11 attempt 4): both changes
+asked the model to do more with its context, and both cost accuracy.
+
+**Consequence for any future attempt at F-17, F-14 or F-01:** context *coherence*
+appears to matter more to this model than context *coverage*. Fixes that
+fragment the context to improve a retrieval metric should be expected to make
+answers worse, and must be judged on answers rather than on what was retrieved.
+
+The tomato case also showed the cap cannot help where the corpus is thin: only
+three documents cleared the floor, so the deferred passages were backfilled and
+four near-duplicates of one page survived. That needs near-duplicate detection,
+which is a different change.
+
 ### F-14 · The answer is a source digest, not an answer
 **Severity: high for the panel half of `S_acc` — OPEN. One fix measured and
 rejected.**
@@ -343,6 +446,113 @@ how the model is told to summarise. Six numbered blocks is what invites six
 numbered blocks back. Merging passages into continuous text with inline markers,
 or presenting fewer and longer passages, both attack the cause rather than
 asking the model to compensate for it.
+
+### F-21 · Livestock has no species filter
+**Severity: medium — OPEN.**
+
+Two of six passages for *"my goat has a swollen jaw and a pot belly"* came from
+**"Climate Smart Aquaculture for Smallholder Fish Farmers"**, at 0.777 and
+0.781. The same leak put an aquaculture document in a chicken question earlier.
+
+`_demote_off_crop` keeps maize passages out of cassava questions, and there is
+no equivalent for animals: fish, poultry, goats and cattle compete freely for
+the same six slots. A third of the context went to fish for a goat question.
+
+The fix mirrors the crop one — `scope.py` would need a species vocabulary
+alongside `IN_SCOPE_CROPS`, and the same three-way treatment (on-species,
+off-species, neutral), since general husbandry and biosecurity material applies
+across animals and must stay neutral.
+
+**Do not build it without measuring answers.** The per-document cap (F-17) also
+looked obviously right, improved every retrieval statistic, and made the answer
+worse. This one is narrower — it demotes rather than diversifies, so it should
+not fragment the context the way the cap did — but that was the argument for the
+cap too.
+
+### F-22 · Web furniture survives into answers
+**Severity: medium — FIXED.**
+
+Asked what was cutting his seedlings, a farmer was told to consider solarising
+the seedbed and *"for more information on solarization, **refer to the link
+provided**"*. There is no link. Much of the corpus is a website converted to
+text and the navigation came with it.
+
+**2,520 chunks — 6.2% of the index** — carry bare URLs, institutional footers,
+"click here", "read more". Same class as F-16's figure captions: page structure
+read as content.
+
+Added to `strip_furniture`. URLs go unconditionally; cross-reference phrases are
+stripped only as far as the phrase, never to the end of the sentence, because
+*"for more information see your extension officer"* is real advice and only the
+dangling half is furniture. Verified: real referrals survive untouched.
+
+### F-18 · The farmer's symptom returned as an instruction
+**Severity: high — OPEN. A new failure class, not a bad fact from a source.**
+
+Asked *"my seedlings are cut at the base every night"*, the system answered,
+among other things:
+
+> *"For cutworms, **cut off seedlings at the base every night**."*
+
+The description was handed back as advice. A farmer following it would destroy
+their own crop.
+
+This is not a retrieval defect and not a fabrication — no source says it. The
+model has re-emitted the question as an imperative, which none of the existing
+guards addresses: `is_usable` filters passages, `check_answer` looks for
+hazardous actives and unsupported dosages, and `strip_false_disclaimer` removes
+a specific opening. Nothing compares the answer against the *question*.
+
+**Detection is plausible and cheap:** an imperative sentence in the answer whose
+content closely matches the farmer's symptom description is almost always this
+bug. The symptom text is right there in `advise()`. A similarity check between
+each generated imperative and the question, flagging near-copies, would catch it
+without a model.
+
+Not attempted yet. Filed because it is the kind of defect that reads as
+confident, ordinary advice.
+
+### F-19 · The hazardous list screened on the wrong axis
+**Severity: high — FIXED.**
+
+The same answer recommended *"carbaryl or chlorpyrifos"* and, for damping-off,
+*"thiophanate-methyl or mancozeb"*. **Only carbaryl was caught.**
+
+`HAZARDOUS_ACTIVES` screened on **WHO Class Ia/Ib and Rotterdam Annex III** —
+that is, on how quickly a compound kills an adult. By that criterion the misses
+were correct:
+
+| compound | WHO acute class | actually |
+|---|---|---|
+| chlorpyrifos | **II** | banned across the EU, severely restricted in the US — developmental neurotoxicity in children |
+| mancozeb | **III** | banned in the EU 2021 — suspected endocrine disruptor and reproductive toxicant |
+
+**The criterion was the defect, not the coverage.** A screen that asks only "how
+fast does this kill" cannot see compounds withdrawn for what they do to children
+slowly — and those are the ones a smallholder is most likely to be sold, because
+their mild acute class kept them on the shelf longest.
+
+Added 28 actives restricted for chronic harm: neonicotinoids, dithiocarbamates,
+benzimidazoles, triazines and the moderately-acute organophosphates. 81 → 109.
+All four compounds from the original answer are now flagged.
+
+**§5's disclaimer stands and is now more honest for it:** the list remains
+curated and not exhaustive, and a compound's absence is still not evidence of
+safety. But it no longer screens on an axis orthogonal to the reason most
+modern bans happen.
+
+### F-20 · Answers drift into adjacent topics
+**Severity: medium — OPEN.**
+
+The cutworm question also produced a full section on **damping-off** — a fungal
+disease of seedlings, with its own fungicide recommendations. The farmer asked
+about something cutting their seedlings at night.
+
+Both appear in the same source material because both affect seedlings, so
+retrieval brings the neighbour along and the model treats it as equally
+requested. It is the same root as F-16's caption problem — adjacency in a
+document read as relevance — and it doubles the length of an answer with content
+nobody asked for.
 
 ### F-15 · A fabricated claim no current check can catch
 **Severity: high — OPEN, and the measurement gap matters more than the instance.**

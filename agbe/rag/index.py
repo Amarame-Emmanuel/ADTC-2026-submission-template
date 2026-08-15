@@ -146,6 +146,60 @@ def _demote_off_crop(
     return on_crop + off_crop
 
 
+def _promote_named_pest(
+    fused: list[int], chunks: list[Chunk], query_text: str
+) -> list[int]:
+    """Sort passages naming the identified pest above those that do not.
+
+    Asked about "white cottony insects on the growing tip of my cassava", the
+    system answers about spiralling whitefly. That is cassava mealybug: both
+    insects leave white waxy material, and the discriminator is LOCATION - the
+    mealybug attacks the growing tip, the spiralling whitefly the undersides of
+    leaves.
+
+    Everything upstream already works. `query.sign_names` maps "cottony" to
+    "mealybug" and puts it in the query; mealybug passages ARE retrieved. They
+    then lose 8:4 to whitefly content, because all six passages come from one
+    document whose pest section leads with whitefly, and a 1.5B model follows
+    the majority of what it is handed.
+
+    WHY THIS AND NOT THE PER-DOCUMENT CAP
+    -------------------------------------
+    A cap of two passages per document was built and reverted. It worked on its
+    own terms - six passages from five documents instead of one, mealybug
+    leading 8:7, a dedicated Mealybugs document retrieved - and the answer got
+    WORSE: it invented "the spiralling whitefly is a natural enemy of cassava
+    pests", repeated four times, and recycled a document title as advice.
+
+    The lesson recorded in FINDINGS F-17 is that context COHERENCE matters more
+    to this model than context COVERAGE. Fragmenting the context across five
+    documents to improve a retrieval statistic cost more than the statistic was
+    worth.
+
+    So this reorders WITHIN the passages already retrieved. Same documents, same
+    count, no new sources - only which of them the model reads first. It is the
+    narrowest intervention that addresses the 8:4 imbalance, and it is designed
+    not to disturb the property the cap disturbed.
+
+    Nothing is dropped: passages not naming the pest keep their order behind
+    those that do, so a question whose corpus has no such passage is unaffected.
+    """
+    from agbe.rag.query import sign_names
+
+    names = sign_names(query_text)
+    if not names:
+        return fused
+
+    named: list[int] = []
+    rest: list[int] = []
+    for idx in fused:
+        c = chunks[idx]
+        haystack = f"{c.title} {c.text}".lower()
+        (named if any(n in haystack for n in names) else rest).append(idx)
+
+    return named + rest
+
+
 class VectorIndex:
     """Exact cosine-similarity search over normalised passage vectors."""
 
@@ -236,6 +290,11 @@ class VectorIndex:
         # passages returned in a different order. It has to change which
         # candidates are considered, not how the chosen ones are sorted.
         fused = _demote_off_crop(fused, self.chunks, query_text)
+
+        # Then, within what survives, let passages naming the identified
+        # pest lead. Reorders only - same documents, same count. See
+        # _promote_named_pest for why this is not the per-document cap.
+        fused = _promote_named_pest(fused, self.chunks, query_text)
 
         # Passages the lexical ranker put at the very top are exempt from the
         # dense floor.

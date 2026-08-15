@@ -47,6 +47,7 @@ from agbe.rag import scope
 from agbe.translate.detect import detect
 from agbe.translate.messages import get as get_messages
 from agbe.rag.compress import compress_hits
+from agbe.rag.quality import strip_furniture
 from agbe.rag.embedder import Embedder
 from agbe.rag.index import SearchHit, VectorIndex
 from agbe.rag.query import retrieval_query, with_diagnostic_intent
@@ -247,10 +248,42 @@ def build_prompt(
     """
     texts = passage_texts if passage_texts is not None else [h.chunk.text for h in hits]
 
-    blocks = []
+    # Continuous evidence with trailing markers, NOT a numbered list.
+    #
+    # Sources used to arrive as six blocks headed "[1] Title (year)", and the
+    # model mirrored that structure: six blocks in, six numbered paragraphs out,
+    # one summarising each. Observed on unrelated questions - a yam market query
+    # answered in six blocks of which four described what a document contains,
+    # a Newcastle query that included a necropsy description, a cutworm query
+    # that produced eight.
+    #
+    # Instructing the model not to do it was tried and cost 9 points of answer
+    # accuracy: told to write one answer and skip what the farmer cannot act on,
+    # it dropped "mealybug", "striga" and "nitrogen deficiency" instead. See the
+    # comment above SYSTEM_PROMPT.
+    #
+    # So the cue is removed rather than argued with. A leading "[n]" on its own
+    # line reads as an item in a list to be worked through; a trailing marker
+    # reads as a citation on a piece of evidence. The provenance is identical -
+    # same passages, same numbering, same mapping to hits - and section 5's
+    # guarantee that every claim traces to a source is unaffected, because the
+    # marker still sits with its own text.
+    #
+    # The title and year move to the end of the passage for the same reason:
+    # leading them makes each passage announce itself as a document, which is
+    # what invites "[4] The training manual provides detailed symptoms...".
+    #
+    # The marker is a bare "[n]" and the attribution sits before it, because the
+    # model copies the citation format it is shown. A first version wrote
+    # "[1: Title, 2018]" and the answers came back citing "[4: Spider mites,
+    # 2018]" - and on three of four questions stopped citing altogether, since
+    # the shown format no longer matched the "cite them like [1]" instruction.
+    # Show it exactly the shape you want back.
+    parts = []
     for i, (hit, text) in enumerate(zip(hits, texts), start=1):
-        blocks.append(f"[{i}] {hit.chunk.title} ({hit.chunk.year})\n{text}")
-    sources = "\n\n".join(blocks)
+        body = " ".join(text.split())
+        parts.append(f"{body} ({hit.chunk.title}, {hit.chunk.year}) [{i}]")
+    sources = "\n\n".join(parts)
 
     # Only questions carrying a temporal marker pay for the note. See
     # _TIME_DEPENDENT: the system has no clock, and answering "should I sell
@@ -330,6 +363,16 @@ class AdvisoryEngine:
             hits, query_vector, self.embedder,
             total_token_budget=config.RETRIEVAL.context_token_budget,
         )
+
+        # Strip captions, running heads and page numbers before the model reads
+        # the passage. A caption belonging to the previous section put "the
+        # variegated grasshopper" two lines above whitefly control advice, and
+        # the answer recommended encouraging one of cassava's worst pests as a
+        # natural enemy. See agbe/rag/quality.py: strip_furniture.
+        #
+        # After compression, not before: compression scores whole sentences, and
+        # a caption that survives selection is exactly the one worth removing.
+        texts = [strip_furniture(t, h.chunk.title) for t, h in zip(texts, hits)]
         return hits, texts, stats
 
     # -- generation --------------------------------------------------------
