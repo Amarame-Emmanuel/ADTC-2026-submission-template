@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-08-15T09:57:32+00:00",
+  "generated_at": "2026-08-15T12:06:27+00:00",
   "split": "dev",
   "n_in_scope": 33,
-  "n_out_scope": 5,
-  "elapsed_s": 754.8,
-  "answer_accuracy": 0.8788,
+  "n_out_scope": 9,
+  "elapsed_s": 782.0,
+  "answer_accuracy": 0.9394,
   "counts": {
-    "OK": 29,
+    "OK": 31,
     "NOT_USED": 2,
-    "MISSED": 2,
+    "MISSED": 0,
     "UNGROUNDED": 0
   },
   "refusal": {
-    "refused": 5,
-    "total": 5,
+    "refused": 9,
+    "total": 9,
     "value": 1.0
   },
   "rows": [
@@ -127,15 +127,19 @@
       "area": "crop",
       "crop": "cassava",
       "question": "There are white cottony insects on the growing tip of my cassava",
-      "verdict": "MISSED",
+      "verdict": "OK",
       "refused": false,
       "expect_any": [
         "mealybug",
         "phenacoccus"
       ],
-      "terms_in_answer": [],
-      "terms_in_sources": [],
-      "answer_head": "To address the white cottony insects on your cassava growing tip, start by removing any affected leaves and stems. Next, clean the area around the growing tip to prevent the spread of pests. Consider using a water-solubl"
+      "terms_in_answer": [
+        "mealybug"
+      ],
+      "terms_in_sources": [
+        "mealybug"
+      ],
+      "answer_head": "[1] The spiraling whitefly, a common pest, can be controlled by removing infected plants and using insecticides. [2] The spiraling whitefly causes honeydew, which supports the growth of black mold, leading to leaf drop. "
     },
     {
       "id": "crop-10",
@@ -261,7 +265,7 @@
       "area": "crop",
       "crop": "tomato",
       "question": "There are white winding lines inside my tomato leaves",
-      "verdict": "MISSED",
+      "verdict": "OK",
       "refused": false,
       "expect_any": [
         "leaf miner",
@@ -269,9 +273,14 @@
         "miner",
         "tuta"
       ],
-      "terms_in_answer": [],
-      "terms_in_sources": [],
-      "answer_head": "Check for whiteflies. Use insecticidal soap or pyrethrin spray to control them. Keep the area clean and free of debris. If the problem persists, consider using a biological control method or consulting a local agricultur"
+      "terms_in_answer": [
+        "miner"
+      ],
+      "terms_in_sources": [
+        "liriomyza",
+        "miner"
+      ],
+      "answer_head": "Based on the information provided, leafminers are the most likely culprit. To control leafminers, you should rotate your crops with non-host vegetables and plan your fields to avoid reservoirs of infestation. Additionall"
     },
     {
       "id": "crop-23",
@@ -495,15 +504,14 @@
         "nervous"
       ],
       "terms_in_answer": [
-        "newcastle",
-        "nervous"
+        "newcastle"
       ],
       "terms_in_sources": [
         "newcastle",
         "twisting",
         "nervous"
       ],
-      "answer_head": "I'm sorry to hear about your chickens. Newcastle disease is a serious issue that can quickly kill your birds. Here are some steps to help prevent and manage Newcastle disease in your flock: 1. **Monitor and Control**: Ke"
+      "answer_head": "I'm sorry to hear about your chickens. Newcastle disease is a serious issue that can quickly spread through a flock. Here are some preventive and cultural control measures to help protect your flock: 1. **Maintain Good H"
     },
     {
       "id": "lstk-07",

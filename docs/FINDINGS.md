@@ -11,7 +11,7 @@ Blocking problems are not filed here — those stop work and get raised directly
 | | finding | why it ranks here |
 |---|---|---|
 | **1** | F-01 control advice | one untried idea (score-weighted fusion); ceiling measured at ~1 chunk in 6 |
-| **2** | F-02 two questions retrieve nothing | overlaps F-01 |
+| — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
 | — | F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
 
@@ -19,8 +19,8 @@ Blocking problems are not filed here — those stop work and get raised directly
 §3.3b), the sweep range (now derived from observed scores — §6.2), the
 answer-level metric (`make answers` — §6.9), **F-11** split instability, and
 **F-04** off-crop retrieval, **F-05** off-domain refusal, **F-09** refusal
-resolution, **F-06** the score/rank mismatch, and **F-12** the mmap copy
-(build-time; effective on next re-index).
+resolution, **F-06** the score/rank mismatch, **F-12** the mmap copy
+(build-time; effective on next re-index), and **F-02** the symptom→name gap.
 
 ---
 
@@ -114,17 +114,59 @@ a retrieval problem and no model change will move it — which the multi-model
 test already demonstrated, since 0.5B, 1.5B and 3B all failed and recovered
 together.
 
-### F-02 · Two questions retrieve nothing relevant
-**Severity: medium.** From the first answer-level run (`answers_dev.json`):
+### F-02 · Two questions retrieved nothing relevant
+**Severity: medium — FIXED, and it is the first retrieval change that improved
+answers rather than only rankings.**
 
-- `crop-05` — *"There are white cottony insects on the growing tip of my cassava"*
-  (cassava mealybug). The Zambia manual's contents list a "Cassava Mealybug"
-  section, so the corpus almost certainly holds it.
-- `crop-22` — *"There are white winding lines inside my tomato leaves"*
-  (leaf miner).
+`crop-05` (*"white cottony insects on the growing tip of my cassava"*) and
+`crop-22` (*"white winding lines inside my tomato leaves"*) were `MISSED` —
+neither retrieved nor answered.
 
-Both are `MISSED`: neither retrieved nor answered. Both are highly visual,
-plain-language symptom descriptions — exactly the register the system is for.
+**Probed first, and it was not a corpus gap.** The corpus holds **236 mealybug
+chunks** and **204 leafminer chunks**. `crop-05`'s best mealybug chunk sat at
+dense rank 18 *inside a document the query already retrieved* — right document,
+wrong chunks. `crop-22`'s dedicated *Leafmining flies* document sat at rank 70
+while the query returned Helicoverpa, Fusarium wilt, whiteflies and early
+blight.
+
+**The cause was a symptom→name vocabulary gap.** A farmer writes what they see;
+the corpus files it under a name they do not know. `bge-small` does not bridge
+"white cottony insects" to "mealybug", which is the same failure that left the
+cassava mosaic page at rank 268 in §6.8.
+
+**Fix:** `_SIGN_TO_NAME` in `agbe/rag/query.py` — nine mappings from a
+distinctive visible sign to the name the literature uses. Deliberately small:
+only signs where the mapping is not in doubt. "Yellow leaves" maps to a dozen
+causes and is absent; "cottony masses" maps to one.
+
+**Why this is not the circular expansion rejected earlier.** That one appended
+"cassava mosaic disease virus stunting" — it named the diagnosis it was
+searching for. This supplies **search terms, not answers**: retrieval must still
+find the passage, the floor must still clear, every claim still comes from a
+citation, and a wrong mapping degrades to worse ranking rather than putting
+words in the model's mouth. It is the same class of curated, auditable lookup as
+`pidgin_norm` and the safety lexicons.
+
+**Measured end to end:**
+
+| dev | before | after |
+|---|---|---|
+| Answer accuracy | 87.9% (29/33) | **93.9% (31/33)** |
+| `MISSED` | 2 | **0** |
+| `NOT_USED` | 2 | 2 |
+| `UNGROUNDED` | 0 | **0** |
+| Coverage / refusal | 97.0% / 100% | 97.0% / 100% |
+| Test coverage / refusal | 100% / 100% | 100% / 100% |
+
+On-target passages in the top-6 went 0→3 for `crop-05` and 0→4 for `crop-22`,
+with the dedicated leafminer document rising from rank 70 to rank 1. `crop-23`
+matched no sign and is unchanged, so the lexicon is not firing indiscriminately.
+
+**Caveat worth keeping.** Nine hand-written mappings are judgement, not fitted
+values — the same limitation §4.5 records for the corpus filter. A wrong mapping
+would steer retrieval confidently astray, which is the §6.8 failure mode. The
+protection is that each sign is distinctive and the floor still applies, not
+that the list has been validated at scale.
 
 ### F-03 · Evidence in context, unused by the model
 **Severity: low — probably noise, on the evidence of two runs.**

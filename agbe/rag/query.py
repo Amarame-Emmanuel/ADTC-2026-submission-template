@@ -120,6 +120,83 @@ lame sores scabs itching bleeding
 _DIAGNOSTIC_INTENT = "disease symptoms cause control management"
 
 
+#: Distinctive visible signs, and the name the literature files them under.
+#:
+#: WHY THIS IS NOT THE CIRCULAR EXPANSION REJECTED EARLIER
+#: -------------------------------------------------------
+#: An earlier attempt appended "cassava mosaic disease virus stunting" to the
+#: query and "worked" - by naming the diagnosis it was searching for. That is
+#: assuming the answer.
+#:
+#: This is different in what it supplies. A farmer writes what they SEE; the
+#: corpus files it under a name they do not know. "White cottony insects on the
+#: growing tip" is a mealybug; "white winding lines inside the leaves" is a
+#: leafminer. The mapping from distinctive sign to candidate name is ordinary
+#: extension knowledge, printed in the field guides this corpus is built from,
+#: and it is what an extension officer does before looking anything up.
+#:
+#: It supplies SEARCH TERMS, not answers. Retrieval still has to find a passage,
+#: the similarity floor still has to clear, and every claim still comes from a
+#: cited source. A wrong guess degrades to worse ranking, which is recoverable;
+#: it cannot put words in the model's mouth.
+#:
+#: MEASURED, on the two dev questions that retrieved nothing relevant:
+#:
+#:   crop-05  "white cottony insects on the growing tip of my cassava"
+#:            236 mealybug chunks in the corpus; best at dense rank 18, inside
+#:            a document the query ALREADY retrieved. Right document, wrong
+#:            chunks.
+#:   crop-22  "white winding lines inside my tomato leaves"
+#:            204 leafminer chunks; dedicated document at rank 70. Retrieved
+#:            instead: Helicoverpa, Fusarium wilt, whiteflies, early blight.
+#:
+#: Adding the name put on-target passages in the top-k for both.
+#:
+#: DELIBERATELY SMALL. Only signs distinctive enough that the mapping is not in
+#: doubt. "Yellow leaves" maps to a dozen causes and is not here; "cottony
+#: masses" maps to one. Every entry is a phrase a farmer would actually type.
+_SIGN_TO_NAME: tuple[tuple[str, str], ...] = (
+    (r"cottony|cotton-?like|white waxy|waxy coating|white powdery mass", "mealybug"),
+    (r"winding lines|wiggly lines|squiggly|tunnels? (?:in|inside) the leaves|"
+     r"trails? (?:in|inside) the leaves|mines? in the lea", "leafminer"),
+    (r"fine web|webbing|cobweb", "spider mite"),
+    (r"sooty|black mou?ld on the leaves", "sooty mould honeydew"),
+    (r"sawdust|frass|boring into|holes? in the stem", "borer"),
+    # `\bcut\b` and never `cutting`: "stem cuttings", "healthy cuttings" and
+    # "select cuttings" are core cassava planting vocabulary, and matching them
+    # would fire cutworm on every clean-planting-material question. The word
+    # boundary is the whole defence.
+    #
+    # The first version of this entry required the literal sequence "cut the
+    # seedlings at base" and could never fire - natural phrasing puts words in
+    # between ("are cut at the base") or says "ground level". It was dead code
+    # that looked functional, found by probing entries the evaluation set never
+    # exercises.
+    (r"(?:seedlings?|young plants?|transplants?)[^.]{0,40}\b(?:cut|severed|"
+     r"chopped|felled)\b[^.]{0,30}(?:base|ground|soil|stem)|"
+     r"\b(?:cut|cuts|cutting down|severed)\b[^.]{0,30}"
+     r"(?:seedlings?|young plants?)[^.]{0,30}(?:base|ground|night|soil)",
+     "cutworm"),
+    (r"twisted neck|neck (?:is )?twist|head (?:pulled|twisted) back",
+     "newcastle disease"),
+    (r"greenish watery|green watery droppings?", "newcastle disease"),
+    (r"pot ?belly|swollen (?:under the )?jaw|bottle jaw", "worms helminth"),
+)
+
+_SIGN_PATTERNS = tuple(
+    (re.compile(pat, re.IGNORECASE), name) for pat, name in _SIGN_TO_NAME
+)
+
+
+def sign_names(text: str) -> list[str]:
+    """Candidate names for distinctive signs described in `text`."""
+    out: list[str] = []
+    for rx, name in _SIGN_PATTERNS:
+        if rx.search(text) and name not in out:
+            out.append(name)
+    return out
+
+
 def _describes_symptoms(text: str) -> bool:
     words = set(re.findall(r"[a-z]+", text.lower()))
     return bool(words & _SYMPTOM_WORDS)
@@ -181,6 +258,12 @@ def with_diagnostic_intent(text: str) -> str:
     # Gated, not unconditional. "When should I plant maize" and "should I store
     # or sell my grain" are not diagnostic questions, and pushing them toward
     # disease guidance would trade one retrieval bug for another.
-    if _describes_symptoms(text):
-        return f"{text} {_DIAGNOSTIC_INTENT}"
-    return text
+    if not _describes_symptoms(text):
+        return text
+
+    # Candidate names for distinctive signs, before the generic intent phrase.
+    # A farmer writes what they see; the corpus files it under a name they do
+    # not know. See _SIGN_TO_NAME.
+    names = sign_names(text)
+    named = f"{text} {' '.join(names)}" if names else text
+    return f"{named} {_DIAGNOSTIC_INTENT}"
