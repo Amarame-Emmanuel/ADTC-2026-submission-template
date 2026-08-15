@@ -6,6 +6,25 @@ rediscovered.
 
 Blocking problems are not filed here — those stop work and get raised directly.
 
+## Priority
+
+| | finding | why it ranks here |
+|---|---|---|
+| **1** | **F-11** split instability | blocks F-09, F-10 and any eval-set growth; silently invalidates published figures |
+| **2** | **F-01** control advice unretrieved | the main remaining quality gap; three fixes already ruled out |
+| **3** | **F-13** `bge-base` embedder | the one lever attacking the *cause* behind F-01, §6.2 and §6.8 |
+| **4** | **F-04** off-crop documents | consumes the slots F-01 needs |
+| 5 | F-09 refusal resolution | blocked on F-11 |
+| 6 | F-05 `oos-09` refused by luck | same fragility that broke `oos-07`/`oos-08` |
+| 7 | F-02 two questions retrieve nothing | overlaps F-01/F-13 |
+| 8 | F-12 mmap | +0.13 points; ride the next re-index |
+| 9 | F-06 score/order mismatch | one comment |
+| — | F-03, F-07, F-08 | resolved or disclosure-only, see below |
+
+**Closed since this file was written:** the Q4_0 quantisation swap (shipped —
+§3.3b), the sweep range (now derived from observed scores — §6.2), and the
+answer-level metric (`make answers` — §6.9).
+
 ---
 
 ## Retrieval and answers
@@ -58,6 +77,13 @@ directions not yet tried:
 The last is worth checking first and is cheap: count how many cassava chunks
 carry that guidance at all.
 
+**Unaffected by the Q4_0 swap.** Retrieval does not depend on the quantisation,
+and the measurements above were re-confirmed on the shipped configuration:
+identical coverage, identical answer accuracy, `clean planting` still 0. This is
+a retrieval problem and no model change will move it — which the multi-model
+test already demonstrated, since 0.5B, 1.5B and 3B all failed and recovered
+together.
+
 ### F-02 · Two questions retrieve nothing relevant
 **Severity: medium.** From the first answer-level run (`answers_dev.json`):
 
@@ -71,11 +97,23 @@ Both are `MISSED`: neither retrieved nor answered. Both are highly visual,
 plain-language symptom descriptions — exactly the register the system is for.
 
 ### F-03 · Evidence in context, unused by the model
-**Severity: medium.** `crop-23` — *"Small white insects fly up when I shake my
-tomato plants"*. The retrieved passages contain `whitefly` and `bemisia`; the
-answer contains neither. A generation problem rather than a retrieval one:
-prompt, passage ordering, or compression. The only `NOT_USED` in the dev split,
-so it may be idiosyncratic — worth re-checking once other changes land.
+**Severity: low — probably noise, on the evidence of two runs.**
+
+The dev split returns exactly one `NOT_USED` under both quantisations, but **not
+the same question**:
+
+| run | `NOT_USED` |
+|---|---|
+| Q4_K_M | `crop-23` — *"Small white insects fly up when I shake my tomato plants"* (sources had `whitefly`, `bemisia`) |
+| Q4_0 (shipped) | `crop-25` — *"Should I plant the same crop in the same place every year?"* (sources had `rotation`, `rotate`, `same field`) |
+
+A stable defect would fail the same question twice. One failure that moves
+between runs at a constant rate of 1/30 looks like generation variance at
+`temperature=0.3`, not a bug with a fix.
+
+Worth re-checking if the count ever rises above one, which is the signal that
+would distinguish a real generation problem from sampling noise. Not worth
+chasing at n=1.
 
 ### F-04 · Off-crop documents rank inside the top 6
 **Severity: medium.** *Guide for sustainable maize production in Ghana* and
@@ -129,15 +167,47 @@ This is deliberate and documented inside the function, but nothing at the call
 site says so, and it cost time to work out while debugging. A one-line comment
 where `SearchHit.score` is consumed would settle it.
 
-### F-07 · Answer accuracy and coverage disagree by ~7 points
-**Severity: informational — this is the tool working.** Dev coverage is 96.7%
-while answer accuracy is 90.0%. Coverage counts a question as covered when a
-passage containing an expected term is retrieved; the answer may still not use
-it. Every number in `REPORT.md` §6 is a coverage number, and coverage is the
+### F-07 · Answer accuracy and coverage disagree by 6.7 points
+**Severity: informational — RESOLVED, now stated in the report.**
+
+Dev coverage is 96.7% while answer accuracy is 90.0%. Coverage counts a question
+as covered when a passage containing an expected term is retrieved; the answer
+may still not use it. Every retrieval number in `REPORT.md` §6 is therefore the
 optimistic one.
 
-Worth stating in the report rather than leaving the two numbers to be compared
-by a reader who notices.
+Written up in §6.9 and in the opening status note, so a reader is told rather
+than left to notice. No further action.
+
+### F-13 · `bge-small` is implicated in three separate failures
+**Severity: high — the one lever that attacks a cause rather than a symptom.**
+
+The embedder's compressed similarity range shows up as three different problems
+that have been treated as three problems:
+
+- §6.2 — everything above ~0.55 matched, forcing the floor to 0.70
+- §6.8 — the cassava mosaic page sat at dense **rank 268** while rank 1 to rank
+  268 spanned only **0.089** of score
+- F-01 — control passages sit at rank 30 and fusion cannot reach them, because
+  ranks are packed too tightly for a good chunk to climb
+
+That is one 33M-parameter, 384-dimension encoder with poor separation, observed
+three times. `bge-base-en-v1.5` is 109M at 768 dimensions with materially better
+discrimination.
+
+**Cost:** ~+140 MB resident (model ~110 MB vs ~35 MB, vector matrix 132 MB vs
+66 MB), so `S_eff` 76.7 → ~74.7, about **−0.4 final points**. Retrieval latency
+roughly doubles to ~130 ms, which is irrelevant against an ~18 s TTFT.
+Generation is untouched, so `S_perf` does not move. Needs a **3–4 hour
+re-index**.
+
+**Probe before committing to that.** Embed only the 70 evaluation questions and
+the cassava chunks with `bge-base` and check whether the ACMV page moves from
+rank 268 into the top 10. Minutes, not hours, and it predicts the full re-index.
+
+**Judge it with `make answers`, not with term counts.** The baseline is 90.0%
+answer accuracy with 2 `MISSED` — and `MISSED` is precisely the quadrant a
+better embedder should move. Four retrieval changes were argued for on reasoning
+this week and three of them failed; this one should be measured.
 
 ---
 
