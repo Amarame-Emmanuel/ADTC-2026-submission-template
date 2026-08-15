@@ -10,8 +10,9 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | **F-01 / F-13** | **probed — both have a low ceiling; read the probe results before spending time** |
-| **2** | F-02 two questions retrieve nothing | overlaps F-01/F-13 |
+| **1** | F-01 control advice | one untried idea (score-weighted fusion); ceiling measured at ~1 chunk in 6 |
+| **2** | F-02 two questions retrieve nothing | overlaps F-01 |
+| — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
 | — | F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
 
 **Closed since this file was written:** the Q4_0 quantisation swap (shipped —
@@ -295,8 +296,26 @@ optimistic one.
 Written up in §6.9 and in the opening status note, so a reader is told rather
 than left to notice. No further action.
 
-### F-13 · `bge-small` is implicated in three separate failures
-**Severity: high — the one lever that attacks a cause rather than a symptom.**
+### F-13 · `bge-small` — hypothesis PROBED AND DECLINED, not a fix
+**Status: closed. Negative expected value; do not open without new evidence.**
+
+**This was mis-filed as a finding.** The observation is sound — `bge-small`'s
+compressed similarity range is *implicated* in three problems — but "implicated
+in" is not "replacing it fixes them", and it was ranked near the top of the list
+before it had been probed. Probing largely disconfirmed it.
+
+**The ledger, all measured:**
+
+| | |
+|---|---|
+| Cost | **−0.4 final points** (`S_eff` 76.7 → 74.7, +140 MB), ~5 hours of compute, +1–2 s TTFT because compression embeds sentences at query time, and a third-party GGUF where Qwen/CompendiumLabs are currently pinned |
+| Benefit | 1 control chunk of 6 entering the top-k; incumbent-to-control gap 0.065 → 0.023 |
+| Unknown | whether any answer changes — the probe could not say |
+
+To break even it needs **+0.8 points of `S_acc`**, which is a low bar it showed
+no sign of clearing. The original observation follows, because the underlying
+diagnosis is still correct and may matter if the corpus or embedder situation
+changes.
 
 The embedder's compressed similarity range shows up as three different problems
 that have been treated as three problems:
