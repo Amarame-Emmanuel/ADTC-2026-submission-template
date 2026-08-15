@@ -10,7 +10,7 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | F-01 control advice | one untried idea (score-weighted fusion); ceiling measured at ~1 chunk in 6 |
+| **1** | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
 | — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
 | — | F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
@@ -27,7 +27,8 @@ resolution, **F-06** the score/rank mismatch, **F-12** the mmap copy
 ## Retrieval and answers
 
 ### F-01 · Control advice is never retrieved
-**Severity: high — this is the main remaining quality gap.**
+**Severity: high — OPEN, but four approaches are now measured and declined. Do
+not attempt a fifth without reading all four.**
 
 `clean planting material` appears **0 times** in the passages sent to the model
 for the submitted test prompt, along with `certified` 0 and `variety` 0. The
@@ -37,8 +38,8 @@ instead of the main stem"* — but retrieval does not reach it.
 The diagnosis defect is fixed; what to do about the diagnosis is not. A farmer
 gets the right disease name and generic advice.
 
-**Three fixes have now been tried and reverted. Do not try a fourth without a
-new idea — try these in order of what has already been ruled out.**
+**Four approaches measured, none shipped.** The fourth is the most instructive,
+because it produced the best single answer and the worst split-wide result.
 
 **Ruled out 1 — a wider candidate pool.** `hybrid_search(candidates=...)` from
 20 to 200 returns a **byte-identical top 6**. Reciprocal-rank fusion is the
@@ -59,10 +60,41 @@ budget is zero-sum.
 partly *wrong*: *"plant in dense vegetation"*, when dense vegetation harbours
 the whitefly vector. `top_k=10` added nothing over 8.
 
+**Ruled out 4 — control vocabulary in the query.** Appending *"clean planting
+material resistant varieties"* to every diagnostic query. On the submitted
+prompt this gave the **best answer any attempt has produced** — correct mosaic
+diagnosis *and* grounded planting-material advice. Across the dev split it was
+the worst:
+
+| dev | shipped | with control vocabulary |
+|---|---|---|
+| Answer accuracy | **93.9%** | **78.8%** |
+| `NOT_USED` | 2 | **7** |
+| `MISSED` | 0 | 0 |
+
+Five questions regressed, including the two the sign lexicon had just fixed.
+
+**And the mechanism is the finding worth keeping.** `MISSED` stayed at 0 —
+retrieval was still finding the passages. What changed was **compression**.
+`compress_hits` scores sentences against the *same query vector* used for
+retrieval, so padding the query with management vocabulary pulls the compressor
+toward management text and away from the sentence naming the pest. The model
+gets a passage containing `mealybug` and an excerpt that does not emphasise it.
+
+**The query vector does double duty, and a change made for retrieval silently
+re-tunes compression.** That is invisible to coverage — only the answer-level
+metric detects it — and it retrospectively explains attempt 3's odd behaviour.
+Any fifth attempt must measure compression's output, not just what was
+retrieved.
+
+Also measured: appending the literal phrase `clean planting material` **alone**
+changes retrieval not at all (mosaic 8, control terms 0). The embedder cannot
+reach those chunks by phrase-match.
+
 **What the evidence points to.** Re-chunking moved control passages from dense
 rank 268 to **rank 30**, so they are close now. The blocker is that fusion
-ranking cannot see them and reservation costs more than it buys. Promising
-directions not yet tried:
+ranking cannot see them and every way of forcing them in costs more than it
+buys. Directions not yet tried:
 
 - score fusion weighted by score rather than by rank, so a 0.77 chunk at rank 30
   can beat a 0.72 chunk at rank 5;
