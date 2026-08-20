@@ -6,6 +6,8 @@ Every case here comes from output the system actually produced.
 from __future__ import annotations
 
 from agbe.advisor import strip_false_disclaimer
+import pytest
+
 from agbe.rag import scope
 from agbe.translate.detect import detect
 from agbe.translate.messages import MESSAGES, VALIDATED_LANGUAGES, get
@@ -133,13 +135,81 @@ class TestValidatedMessages:
                 value = getattr(msgs, field)
                 assert value and value.strip(), f"{lang}.{field} is empty"
 
+    #: Fields deliberately serving English to every language, because no
+    #: speaker has reviewed a translation yet. Listed explicitly rather than
+    #: skipped, so the debt is visible in the test file and has to be actively
+    #: deleted from this set when a speaker approves a string - the failure
+    #: mode this guards against is a gap nobody remembers.
+    PENDING_SPEAKER_REVIEW = {"harmful_request"}
+
     def test_pidgin_differs_from_english(self):
         """Guards against a language silently falling back to copied English."""
         en, pcm = MESSAGES["en"], MESSAGES["pcm"]
         for field in en.__dataclass_fields__:
+            if field in self.PENDING_SPEAKER_REVIEW:
+                continue
             assert getattr(en, field) != getattr(pcm, field), field
+
+    def test_pending_review_fields_are_genuinely_identical(self):
+        """An exemption must be an exemption, not a place to hide a change.
+
+        If someone writes a Pidgin string for a listed field but forgets to
+        remove it from the set, the guard above stays switched off for a field
+        that no longer needs it. This fails in that case.
+        """
+        en, pcm = MESSAGES["en"], MESSAGES["pcm"]
+        for field in self.PENDING_SPEAKER_REVIEW:
+            assert getattr(en, field) == getattr(pcm, field), (
+                f"{field} now differs - remove it from PENDING_SPEAKER_REVIEW"
+            )
 
     def test_unknown_language_falls_back_to_english(self):
         """Falling back is safe; emitting unverified output is not."""
         assert get("hau") is MESSAGES["en"]
         assert get("zz") is MESSAGES["en"]
+
+
+class TestLivePriceGap:
+    """A price question must be refused however the farmer phrases it.
+
+    `_LIVE_PRICE` refused "what is the price of a bag of maize in Ibadan market
+    today?" - the evaluation set's wording - and ANSWERED "what is maize selling
+    for in Ibadan today?", because the alternation required `today` to follow
+    `selling for` immediately and a place name sat between them. It also
+    answered "what are tomatoes selling for in the market?", which carries no
+    time word at all.
+
+    The second is the instructive one: the present tense is itself the live
+    marker. No price was invented in either case, but section 1 says today's
+    price is a fact the system does not have, and answering the question at all
+    contradicts that.
+    """
+
+    REFUSE = [
+        "What is maize selling for in Ibadan today?",
+        "What are tomatoes selling for in the market?",
+        "what is the price of a bag of maize in Ibadan market today?",
+        "How much is a basket of tomatoes going for?",
+        "What is the current price of yam?",
+    ]
+
+    #: Judgement, not fact. These are answerable from extension material and
+    #: were the reason `sell` alone could never be the trigger.
+    ANSWER = [
+        "When is the best time to sell my cassava?",
+        "Should I sell my maize now or store it?",
+        "Should I sell my groundnut as seed or for eating?",
+        "How do I grade my tomatoes before selling?",
+        "How can I add value to my cassava instead of selling it raw?",
+        "Is there an advantage to selling together with other farmers?",
+    ]
+
+    @pytest.mark.parametrize("question", REFUSE)
+    def test_price_lookups_are_refused(self, question):
+        verdict = scope.check(question)
+        assert not verdict.in_scope
+        assert verdict.reason == "live price"
+
+    @pytest.mark.parametrize("question", ANSWER)
+    def test_selling_judgement_still_answered(self, question):
+        assert scope.check(question).in_scope

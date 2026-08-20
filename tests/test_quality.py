@@ -6,7 +6,13 @@ model for the cassava question described in agbe/rag/quality.py.
 
 from __future__ import annotations
 
-from agbe.rag.quality import is_front_matter, is_garbled, is_usable, real_word_share
+from agbe.rag.quality import (
+    is_front_matter,
+    is_garbled,
+    is_question_checklist,
+    is_usable,
+    real_word_share,
+)
 
 # Verbatim from the index: the title page of an IITA field guide, retrieved as
 # though it were guidance because it carries the document title and the crop.
@@ -71,3 +77,48 @@ def test_one_citation_does_not_condemn_a_good_passage():
 def test_short_fragments_are_not_judged_as_garbled():
     """Too little text to measure. Let the other rules decide."""
     assert real_word_share("Signs of the disease:") == 1.0
+
+
+def test_a_third_person_questionnaire_is_a_checklist() -> None:
+    """The person test was a proxy, and it made the rule inert for an exam.
+
+    `_MIN_SELF_ASSESSMENT` was written for a business-plan workbook, which
+    quizzes the reader directly ("Have you determined whether to price below
+    the market?"). A yam-disease research guide ends with a bare exam instead:
+
+        Questionnaire 1 Where are yams cultivated? 2 What are the major
+        cultivated yam species grown in West Africa? 3 What are climatic
+        requirements for yam cultivation? ...
+
+    Thirteen consecutive unanswered questions, not one addressed to a reader,
+    `is_question_checklist` returning False - and the passage took a retrieval
+    slot from a farmer asking why their yam tubers were rotting in the barn.
+
+    The unbroken run is the direct evidence: an FAQ alternates question and
+    answer by definition, so it cannot produce one.
+    """
+    exam = (
+        "Questionnaire 1 Where are yams cultivated? "
+        "2 What are the major cultivated yam species grown in West Africa? "
+        "3 What are climatic requirements for yam cultivation? "
+        "4 What is the effect of yam diseases? "
+        "5 What are the major foliage diseases of yams? "
+        "6 How is yam mosaic virus transmitted?"
+    )
+    assert is_question_checklist(exam) is True
+    assert is_usable(exam)[0] is False
+
+
+def test_a_short_run_of_topic_questions_still_needs_the_person_test() -> None:
+    """Five, not three, so the ambiguous middle is still governed by person.
+
+    Extension prose does pose questions and answer them, and a three-question
+    run is short enough to happen in real teaching material. Only a run too
+    long to be an FAQ skips the person requirement.
+    """
+    faq = (
+        "What causes yellowing along the veins? A virus spread by whiteflies. "
+        "How do you stop it? Use clean planting material. "
+        "When should you rogue? As soon as symptoms appear."
+    )
+    assert is_question_checklist(faq) is False

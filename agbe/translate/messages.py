@@ -64,6 +64,15 @@ class MessageSet:
     human_medical: str
     out_of_scope_crop: str
 
+    #: Deliberately carries an English default rather than appearing in every
+    #: MessageSet. Every other string here was reviewed by a Nigerian Pidgin
+    #: speaker on 2026-08-07; this one was added later and has not been. The
+    #: documented fallback - English rather than an unreviewed translation -
+    #: is the right behaviour for a refusal, and get() already implements it.
+    #: Replace the default with a per-language string once a speaker has
+    #: approved one.
+    harmful_request: str = "I am sorry, but I cannot help with that."
+
 
 MESSAGES: dict[str, MessageSet] = {
     "en": MessageSet(

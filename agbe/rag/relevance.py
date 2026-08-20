@@ -162,6 +162,36 @@ CROP_TERMS = {
     "okra": {"okra", "abelmoschus"},
 }
 
+#: Crops that are neither in scope nor recognised by CROP_TERMS above.
+#:
+#: WHY THIS EXISTS SEPARATELY FROM CROP_TERMS
+#: `_demote_off_crop` partitions candidates using CROP_TERMS, which lists the
+#: NINE IN-SCOPE crops. A passage about a crop that is neither asked about nor
+#: in scope matches nothing, is classified NEUTRAL, and is therefore never
+#: demoted - the docstring's "neutral counts as on-topic, deliberately" was
+#: written about passages naming NO crop and silently also covered passages
+#: naming a crop the vocabulary had never heard of.
+#:
+#: Two defects reduced to that one gap:
+#:   - "my rice leaves have orange-brown spots" retrieved "Bean Leaves (New)"
+#:     at 0.719 and answered with angular leaf spot caused by Phaeoisariopsis
+#:     griseola, a BEAN disease. Brown leaf spot (Bipolaris oryzae) was in the
+#:     corpus and had been retrieved.
+#:   - crop-22, the last remaining coverage gap, retrieved "Papaya (Revised)
+#:     (Aphis gossypii)" for a tomato leafminer question.
+#:
+#: Neither `bean` nor `papaya` appears in scope.OUT_OF_SCOPE_CROPS, which exists
+#: to refuse QUESTIONS about other crops and is a different job.
+OTHER_CROP_TERMS = {
+    "bean", "beans", "phaseolus", "papaya", "pawpaw", "carica",
+    "mango", "citrus", "avocado", "pineapple", "watermelon",
+    "cocoa", "cacao", "coffee", "cashew", "oil palm",
+    "banana", "plantain", "sugarcane", "cotton",
+    "sorghum", "millet", "wheat", "sesame", "soybean", "soya", "soyabean",
+    "sweet potato", "sweetpotato", "cocoyam", "taro",
+    "onion", "cabbage", "carrot", "lettuce", "cucumber",
+}
+
 # --------------------------------------------------------------------------
 # Geography
 # --------------------------------------------------------------------------

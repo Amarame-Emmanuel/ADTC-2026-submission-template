@@ -269,6 +269,13 @@ on Pidgin accuracy. We do not quote one.
 The obvious move with 5.3 GB of spare memory is a larger model. We measured
 instead, and the measurement said the opposite.
 
+**The table below decided the PARAMETER COUNT, and both columns are
+Q4\_K\_M at 50 samples.** That was the shipped quantisation when the A/B
+was run; §3.3b later replaced it with Q4\_0. The comparison remains valid -
+it is like-for-like within itself - but its absolute figures no longer
+describe the submitted system. For those, see the score table below, §3.3b
+and the §6 summary.
+
 Both candidates were evaluated on **ARC-Easy, 50 samples** — the same benchmark
 and sample count the official ADTC profiler uses for the automated half of the
 accuracy score — plus peak RSS, throughput and time to first token:
@@ -323,41 +330,74 @@ Below some capability floor a model cannot be trusted to read sources, which
 is the one job this system leaves to it. 0.5B is under that floor, 3B pays
 for nothing above it: **1.5B is the measured minimum, bounded on both sides.**
 
-Estimated final score under the published formula:
+Estimated final score under the published formula, using the **shipped**
+configuration throughout — Qwen2.5-1.5B at Q4\_0, ARC-Easy over the **full 2,376
+question test set**, peak RSS from the full running application:
 
-| | 1.5B | 3B |
+| term | value | weighted |
 |---|---|---|
-| 0.50 × S\_acc | 37.0 | 37.0 |
-| 0.30 × S\_perf | *see below* | *see below* |
-| 0.20 × S\_eff | **15.1** | 12.3 |
-| **S\_total**, excluding `S_perf` | **52.1** | 49.3 |
+| `S_acc` — ARC-Easy `acc` 0.7449 (n = 2,376) | 74.49 | **37.24** |
+| `S_perf` — `min(30.07 / 15.0, 1.0) × 100` | 100.00 | **30.00** |
+| `S_eff` — `100 × (7 − 1.63) / 7` | 76.71 | **15.34** |
+| `P_thermal` — no throttling signature (§6.7) | 0 | **0** |
+| **`S_total`** | | **82.59** |
 
-**`S_perf` is deliberately left blank, and earlier drafts of this table were
-wrong to fill it in.** They booked 30.0 — a perfect score — for both models. The
-published formula is `S_perf = 100 × (TPS_act ÷ TPS_max)` where `TPS_max` is the
-highest throughput *across all submissions*. It is a rank, not a threshold:
-there is no reference figure to clear and no cap to reach. Booking 30.0 assumed
-we would be the fastest entrant, which is not a measurement we are able to make.
+**`S_perf` is measurable, it is a threshold rather than a rank, and we are at
+the cap.** The profiler's own scoring table gives
+`S_perf = min(TPS / TPS_REFERENCE, 1.0) × 100` with `TPS_REFERENCE = 15.0`. At
+30.07 tok/s on the audit toolchain we are 2.0× the reference, the `min()` clamps
+to 1.0, and the term is full marks. Earlier drafts of this report described
+`S_perf` as normalised against *the fastest submission* and therefore
+unknowable, and reasoned at length about what happens if a rival ships something
+1.5× or 3× faster. **That formula is not the published one.** No such
+sensitivity exists: the denominator is a fixed constant, we clear it twice over,
+and nothing another team does can move our score. Booking 30.0 — which a much
+earlier draft did, and a later one "corrected" — was right.
 
-What can be said is the sensitivity, and it is steep:
+**The accuracy figure took four measurements to settle, and the reason is worth
+recording.** `bench/arc_easy.py` selects questions with `arc[:limit]`, so
+different sample sizes read **nested slices** of the same ordered file rather
+than independent random draws. ARC-Easy is not randomly ordered, so a small
+`limit` is a *biased* estimate, not merely a noisy one:
 
-| If the fastest submission runs at | our `S_perf` | 0.30 × `S_perf` |
+| n | `acc` | 95% CI |
 |---|---|---|
-| our own throughput | 100 | 30.0 |
-| 1.5× ours | 67 | 20.0 |
-| 2× ours | 50 | 15.0 |
-| 3× ours | 33 | 10.0 |
+| 50 | 0.660 | ±13.1 pp |
+| 200 | 0.685 | ±6.4 pp |
+| 1,000 | 0.741 | ±2.7 pp |
+| **2,376 (whole set)** | **0.7449** | **±1.8 pp** |
 
-The spread between the first and last row is 20 points of final score — larger
-than the entire `S_eff` term we spent §3 optimising. It is also the one term no
-amount of care on this machine can pin down, because the denominator belongs to
-other teams. The honest statement is that our controllable score is **52.1**
-plus whatever the field allows, and that `S_perf` deserves more engineering
-attention than its 30% weight suggests, precisely because it is the term we
-cannot measure.
+Questions 201–1,000 score 0.755 against the first 200's 0.685. Choosing `n`
+chooses the answer, which is why the figure above is the **whole file**: there is
+no slice left to argue about. The profiler defaults to `--accuracy-limit 50` for
+smoke testing and its own docstring says *"real audits use the full hidden 30%
+validation subset distributed by judges"*, so 50 was never the audited number
+either.
+
+**Two caveats on `S_acc`, stated because the number above is a proxy.** The
+profiler's scoring table defines `S_acc` as *"based on model responses to
+participant-submitted prompts, domain prompts, and hidden prompts supplied by
+judges"* — it is a **judged** score, not ARC-Easy. ARC is what the profiler
+measures for the report; it is not the leaderboard term. Booking `S_acc` = ARC
+therefore assumes a judged score would land in the same place, which is an
+assumption and not a measurement. It also means the retrieval, refusal and
+grounding work in §§4–6 pays directly into half the final score, and that none
+of it is captured by the 74.49 above.
+
+**What an earlier draft put here, and why it is gone.** This section carried a
+sensitivity table showing our score falling to 20.0, 15.0 and 10.0 as a rival
+submission ran 1.5x, 2x and 3x our throughput, and concluded that `S_perf`
+"deserves more engineering attention than its 30% weight suggests, precisely
+because it is the term we cannot measure". Every part of that is wrong. The
+denominator is `TPS_REFERENCE = 15.0`, a published constant; the term is capped
+at 100; we sit at 2.0x the reference. There is no sensitivity to other
+submissions, and `S_perf` needs no further engineering because it cannot go
+higher. The reasoning was rebuilt on the profiler's own scoring table rather
+than on a remembered formula.
 
 `S_eff` here is computed from **peak RSS of the full running application** —
-1.71 GB for the 1.5B, 2.71 GB for the 3B — because the published formula defines
+1.71 GB for the 1.5B and 2.71 GB for the 3B, both at Q4\_K\_M; the shipped
+Q4\_0 build measures **1.63 GB** — because the published formula defines
 peak RAM as the maximum RSS measured *during the audit*, and what the audit runs
 is the application, not the model in isolation. An earlier version of this table
 used the bare-model figure of 1.19 GB instead, giving `S_eff` 83.0 and a total of
@@ -450,7 +490,30 @@ Measured, same model, same 4 threads, profiler flags:
 | **Q4\_0** | **1.066 GB** | **58.30** | **30.50 tok/s** |
 | IQ4\_XS | 0.896 GB | 11.72 | 9.60 tok/s |
 
-**2.7× on generation from a file 4.6% smaller.** Bytes-per-token explains almost
+**Re-measured 2026-08-20, and the multiple is smaller than stated above.** Three
+independent `llama-bench` runs per model on the same profiler image, `-p 512
+-n 128 -ngl 0 -t 4 -r 5`:
+
+| | `pp512` prefill | `tg128` generation |
+|---|---|---|
+| Q4\_K\_M | 23.71 ± 0.52 | **16.23 / 17.07 / 16.22** (mean ≈ 16.5) |
+| **Q4\_0** | 54.26 ± 4.40 | **30.07 ± 0.58** |
+
+So **1.8×, not 2.7×**. Prefill reproduces the original almost exactly (23.71
+against 24.95); only generation disagrees, and only for Q4\_K\_M — 16.5 against
+the 11.32 recorded above, which does not reproduce on this host today. The
+original figure is left in place rather than overwritten because it was measured
+and there is no basis for deciding which run was disturbed; what can be said is
+that the honest range for the advantage is **1.8× to 2.7×**, and that every
+conclusion drawn from it survives at the bottom of that range.
+
+Five further quantisations and models were probed on 2026-08-19/20 and none beat
+Q4\_0 — Q5\_0 at 5.72 tok/s, Llama-3.2-1B Q4\_0 at 25.89, SmolLM2-1.7B Q4\_0 at
+26.33. **Parameter count does not predict scalar throughput**: Llama-3.2-1B has
+1.24 B parameters against Qwen2.5-1.5B's 1.78 B and is slower. Recorded in
+`docs/FINDINGS.md` F-29.
+
+**A large multiple on generation from a file 4.6% smaller** — 2.7× as first measured, 1.8× on re-measurement. Bytes-per-token explains almost
 none of it — format does. IQ4\_XS is the control that proves the point: 20%
 smaller and *slower*, because importance-matrix quantisation costs more
 arithmetic than it saves in bytes.
@@ -474,12 +537,21 @@ test prompt produces the same correct Cassava Mosaic diagnosis under both, both
 refuse the dosage question, and coverage and refusal are identical because
 retrieval does not depend on the quant. Peak RSS falls 1.68 → **1.63 GB**.
 
-**Why this is worth ~17 points and cannot cost any.** `S_perf` is scored
-relative to the fastest submission. At 11.32 tok/s scalar we would score ~44
-against a field containing any 0.5B-class entry; at 30.5 we are faster than a
-0.5B at Q4\_K\_M (25.94) and plausibly set `TPS_max` ourselves. If no team
-ships anything fast, the gain shrinks toward zero — but it never reverses, which
-is what makes the trade worth one ARC point.
+**What the swap is actually worth, recomputed against the published formula.**
+`S_perf = min(TPS / 15.0, 1.0) x 100`. Re-measured on 2026-08-20, Q4\_K\_M runs
+at ~16.5 tok/s and Q4\_0 at 30.07 - **both clear the 15.0 reference, so both
+score the full 100 and the swap gains nothing on `S_perf`.** Against the 11.32
+originally recorded for Q4\_K\_M it would have been worth 24.5 points of the
+term (75.5 vs 100), so the value of the swap rests entirely on which Q4\_K\_M
+measurement is right, and that is unresolved (see the re-measurement above).
+
+**The swap is kept anyway, on two grounds that do not depend on it.** Peak RSS
+falls 1.71 -> 1.63 GB, worth +1.2 `S_eff`. And headroom over the reference is
+2.0x rather than 1.1x: the audit laptop is a 15 W U-series i5 against this
+55 W i7-14650HX, so measured throughput here is optimistic, and a model sitting
+10% above the threshold on fast hardware is a model that may sit below it on
+slow hardware. Q4\_0 has margin; Q4\_K\_M does not. That, not a ranking, is the
+case for it.
 
 Both files are Qwen's own GGUF builds, so the provenance discipline in
 `models.lock.json` is unchanged — unlike the third-party IQ4\_XS, which was
@@ -679,12 +751,12 @@ quantisation format, not the parameter count, decides `S_perf`).
 |---|---|---|
 | Peak RSS, full application | **1.63 GB** | 7 GB — **PASS**, → `S_eff` **76.7** |
 | RSS after model load, before generation | 1.41 GB | — |
-| Throughput, **audit build** (`llama-bench`, scalar) | **30.5 tok/s** | this is what `S_perf` measures — §3.3b |
+| Throughput, **audit build** (`llama-bench`, scalar) | **30.07 tok/s** | 2.0× `TPS_REFERENCE` 15.0 → `S_perf` **100**, capped — §3.3b |
 | Throughput, dev build (full application) | 32.8 tok/s (p50) | not scored; SIMD favours K-quants |
 | Time to first token (p50 / p95, dev build) | **21.3 s / 24.1 s** | — |
 | Prompt size sent to the model | ~652 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
-| ARC-Easy `acc` / `acc_norm` (**200 samples**) | **0.685 / 0.695** | Q4\_K\_M: 0.695 / 0.720 |
+| ARC-Easy `acc` / `acc_norm` (**full 2,376-question test set**) | **0.7449 / 0.737** | 95% CI ±1.8 pp; smaller samples are biased, not just noisy — see §3.3 |
 | Retrieval coverage (**held-out test**, relevance-checked) | **100%** (28/28) | 80% — **PASS** |
 | Refusal accuracy (**held-out test**) | **100%** (4/4) | 80% — **PASS** |
 | Retrieval latency p50 / p95 | 64 ms / 94 ms | — |
@@ -1459,7 +1531,7 @@ ever demoed or measured with more resources than the target laptop provides.
 copied manually, and it drifted the moment the model changed: `metadata.json`
 declared `GGUF Q4_0` and `model/qwen2.5-1.5b-instruct-q4_0.gguf` while the
 directory held `qwen2.5-1.5b-instruct-q4_k_m.gguf`. Those are precisely the two
-files whose 2.7× throughput difference §3.3b rests on, so a judge would have
+files whose throughput difference §3.3b rests on, so a judge would have
 either failed to find the declared file or silently benchmarked away the entire
 `S_perf` case.
 

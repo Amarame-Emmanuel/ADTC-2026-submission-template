@@ -31,6 +31,7 @@ audit: a reviewer can inspect the index with NumPy and a text editor.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -58,7 +59,7 @@ LEXICAL_FLOOR_EXEMPT = 2
 #: Newcastle chunk sits at 0.679 against a 0.70 floor - a near miss, rescued by
 #: an exact match on "twisting", "neck" and "greenish". The motorcycle question
 #: sits at 0.41, nowhere near, and no lexical evidence should save it.
-LEXICAL_FLOOR_TOLERANCE = 0.05
+LEXICAL_FLOOR_TOLERANCE = 0.08
 
 
 @dataclass
@@ -124,6 +125,7 @@ def _demote_off_crop(
     some other crop *and not* the one asked about, which is the narrowest
     reading of "off-topic" available.
     """
+    from agbe.rag.relevance import OTHER_CROP_TERMS
     from agbe.rag.scope import crops_mentioned
 
     wanted = crops_mentioned(query_text)
@@ -134,9 +136,27 @@ def _demote_off_crop(
     off_crop: list[int] = []
     for idx in fused:
         c = chunks[idx]
-        found = crops_mentioned(f"{c.title} {c.text}")
-        # Neutral (names no crop) counts as on-topic, deliberately.
+        # Out-of-scope crops count toward `found` too.
+        #
+        # crops_mentioned() knows only the nine IN-SCOPE crops, so a passage
+        # about bean or papaya matched nothing, was classified NEUTRAL, and
+        # could never be demoted. "My cowpea leaves have angular brown patches"
+        # answered with common-bean advice and the words "do not work in BEAN
+        # fields", from a document titled by its pathogen (Phaeoisariopsis
+        # griseola) so the title rule below could not see it either.
+        #
+        # This is safe precisely because of the `found & wanted` test that
+        # follows: a cassava document mentioning a banana intercrop still has
+        # cassava in `found`, so it stays on-crop. Only a passage naming other
+        # crops AND NOT the one asked about is demoted.
+        found = crops_mentioned(f"{c.title} {c.text}") | _other_crops(c)
         if found and not (found & wanted):
+            off_crop.append(idx)
+        elif not found and _titled_for_another_crop(c.title):
+            # Neutral by CROP_TERMS, but the TITLE names a crop that vocabulary
+            # has never heard of - "Bean Leaves (New)", "Papaya (Revised)".
+            # Without this branch such a passage sorts as on-topic forever; see
+            # OTHER_CROP_TERMS for the two defects that reduced to it.
             off_crop.append(idx)
         else:
             on_crop.append(idx)
@@ -145,6 +165,85 @@ def _demote_off_crop(
     # is new.
     return on_crop + off_crop
 
+
+def _other_crops(chunk: Chunk) -> set[str]:
+    """Out-of-scope crop names appearing in a passage.
+
+    Returned as a set so it can union with crops_mentioned(). Names are
+    word-anchored: "ban" must not match "banana", and "pea" must not match
+    "cowpea" - the second is why OTHER_CROP_TERMS carries no bare "pea".
+    """
+    from agbe.rag.relevance import OTHER_CROP_TERMS
+
+    low = f"{chunk.title} {chunk.text}".lower()
+    return {
+        t for t in OTHER_CROP_TERMS
+        if re.search(r"\b" + re.escape(t) + r"\b", low)
+    }
+
+
+def _titled_for_another_crop(title: str) -> bool:
+    """Whether a document's TITLE announces a crop that is not in scope.
+
+    The title, not the body, and deliberately so. Extension documents mention
+    other crops constantly - intercrops, rotations, comparisons - and demoting
+    on a body mention would push out most of the corpus. A crop in the TITLE is
+    a statement about what the document is FOR.
+    """
+    from agbe.rag.relevance import OTHER_CROP_TERMS
+
+    low = title.lower()
+    return any(
+        re.search(r"\b" + re.escape(term) + r"\b", low) for term in OTHER_CROP_TERMS
+    )
+
+
+#: Vocabulary that marks a passage as written for a RESEARCHER, not a farmer.
+#:
+#: Asked "my yam tubers are rotting in the barn", the system answered: "use a
+#: hand trowel to carefully remove the tubers from the pot without damaging the
+#: substrate... store them by sorting by family in the barn." Pots, substrate
+#: and families are a genebank nursery protocol. The farmer has a barn.
+#:
+#: The corpus was not the problem. Four of the six retrieved passages were
+#: exactly right - yam barns in Abakaliki, wet rot, nematode damage in storage.
+#: Two were institutional: a Standard Operating Procedure for nursery harvest,
+#: and a guide to in vitro germplasm collections. The model took its steps from
+#: those two, because a procedure written as numbered steps reads more like
+#: instructions than prose about rot does.
+#:
+#: Only unambiguous markers are listed. "Trial", "plot" and "treatment" are
+#: ordinary agronomy words that appear throughout legitimate extension material
+#: and are deliberately absent; `substrate` alone is likewise too weak. What
+#: remains names a research apparatus a smallholder does not have.
+_RESEARCH_REGISTER = re.compile(
+    r"\b(?:standard operating procedure|in vitro|germplasm|genebank|"
+    r"gene bank|accessions?|screen ?house|tissue culture|"
+    r"randomi[sz]ed complete block|research protocol)\b",
+    re.IGNORECASE,
+)
+
+
+def _demote_research_protocol(fused: list[int], chunks: list[Chunk]) -> list[int]:
+    """Move researcher-facing passages to the back of the queue.
+
+    DEMOTION, NOT EXCLUSION, for the same reason as `_demote_off_crop`: a
+    germplasm document can still carry the only description of a disease in the
+    corpus, and this must never *reduce* the evidence available. If there are
+    not enough farmer-facing passages to fill `top_k`, these still appear.
+
+    Applied unconditionally rather than only for storage questions. The register
+    is wrong for a smallholder whatever the topic, and a rule that fires only on
+    the one question that exposed it would be fitting to the example rather than
+    to the defect.
+    """
+    farmer: list[int] = []
+    research: list[int] = []
+    for idx in fused:
+        c = chunks[idx]
+        target = research if _RESEARCH_REGISTER.search(f"{c.title} {c.text}") else farmer
+        target.append(idx)
+    return farmer + research
 
 def _promote_named_pest(
     fused: list[int], chunks: list[Chunk], query_text: str
@@ -295,6 +394,11 @@ class VectorIndex:
         # pest lead. Reorders only - same documents, same count. See
         # _promote_named_pest for why this is not the per-document cap.
         fused = _promote_named_pest(fused, self.chunks, query_text)
+
+        # Researcher-facing passages go behind farmer-facing ones. After the
+        # crop partition and before top_k is taken, so it changes which
+        # candidates are considered rather than reordering the chosen six.
+        fused = _demote_research_protocol(fused, self.chunks)
 
         # Passages the lexical ranker put at the very top are exempt from the
         # dense floor.

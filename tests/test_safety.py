@@ -7,6 +7,8 @@ chemical guidance as current.
 
 from __future__ import annotations
 
+import pytest
+
 from agbe.rag.safety import (
     CHEMICAL_RECENCY_YEARS,
     check_answer,
@@ -15,6 +17,7 @@ from agbe.rag.safety import (
     find_hazardous_actives,
     is_source_stale,
     redact_unsupported_dosages,
+    find_foreign_money,
 )
 
 
@@ -208,3 +211,56 @@ class TestSafeAnswers:
         )
         assert verdict.safe
         assert verdict.as_notice() == ""
+
+
+class TestForeignCurrency:
+    """Prices from another country must be labelled as such.
+
+    Asked "what do traders pay for a bag of maize these days?", the system
+    answered "Traders generally pay farmers between KSh$81.21 and KSh$517 per
+    50 kg bag... In Bungoma, farmers are willing to pay an average of KSh$87."
+    Those are Kenyan shillings, from a CGIAR baseline study in Uasin Gishu and
+    Bungoma, given without qualification to a farmer in southwest Nigeria.
+
+    The scope rule now refuses that question, but the exposure is broader:
+    AFRICA_TERMS admits Kenyan, Ugandan and Malawian material deliberately,
+    because it is good agronomy. Agronomy travels across borders; prices do not.
+
+    A number is required beside the token. Without it "Randomised plots" and
+    "the brand of fertiliser" are prices, and the check becomes noise.
+    """
+
+    FOREIGN = [
+        "Traders pay between KSh 81 and KSh 517 per 50 kg bag",
+        "farmers earned 4,500 Kenyan shillings",
+        "average of UGX 3000 per sack",
+        "about 120 000 TZS for the season",
+        "roughly 25 Ghanaian cedis",
+    ]
+
+    NOT_FOREIGN = [
+        "Sell at N45,000 per bag in Ibadan",
+        "the price rose to 1200 naira",
+        "Grand total of the harvest",
+        "Randomised plots gave higher yields",
+        "The brand of fertiliser matters less than the rate",
+        "Apply 250 kg per hectare",
+        # A currency name with no figure beside it is prose.
+        "Kenyan shilling notes were redesigned",
+    ]
+
+    @pytest.mark.parametrize("answer", FOREIGN)
+    def test_foreign_money_is_found(self, answer):
+        assert find_foreign_money(answer)
+
+    @pytest.mark.parametrize("answer", NOT_FOREIGN)
+    def test_naira_and_prose_are_left_alone(self, answer):
+        assert find_foreign_money(answer) == []
+
+    def test_the_notice_names_the_currency(self):
+        v = check_answer(
+            "Traders pay between KSh 81 and KSh 517 per bag.", source_texts=[]
+        )
+        notice = v.as_notice("en")
+        assert "KSh" in notice
+        assert "not Nigerian prices" in notice

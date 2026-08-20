@@ -181,6 +181,29 @@ _SIGN_TO_NAME: tuple[tuple[str, str], ...] = (
      "newcastle disease"),
     (r"greenish watery|green watery droppings?", "newcastle disease"),
     (r"pot ?belly|swollen (?:under the )?jaw|bottle jaw", "worms helminth"),
+    # Bloat. "My goat left side is swollen and tight after grazing wet grass"
+    # was answered with HOOF-TRIMMING advice - "wet" appears in both the
+    # question and a footrot passage. Bloat kills within hours by pressing on
+    # the diaphragm, so this is the most expensive miss in the probe set.
+    #
+    # Unlike the scouring case, promotion is enough here: the goat bloat
+    # passage sits at fused rank 26 with a dense score of 0.744, comfortably
+    # over the floor. It was never being discarded, only outranked.
+    #
+    # LEFT side specifically - the rumen is on the left, and "swollen" alone
+    # would collide with bottle jaw above.
+    (r"left side[^.]{0,20}swollen|swollen[^.]{0,15}left side|"
+     r"\bbloat(?:ed|ing)?\b|distended[^.]{0,15}(?:side|belly|stomach)|"
+     r"tight[^.]{0,20}(?:after|from) graz", "bloat"),
+    # Lameness. A single lame leg was diagnosed as FOOT-AND-MOUTH DISEASE, a
+    # notifiable transboundary disease - alarming, wrong, and wrong in a way
+    # that sends a farmer to report an outbreak they do not have.
+    #
+    # Here retrieval was already correct: "Foot Rot in Cattle and Sheep" was
+    # in the top six and lost to the FMD passage during generation. Promotion
+    # puts the right document first rather than adding a new one.
+    (r"\blimp(?:ing|s)?\b|not put(?:ting)? weight|\blame\b|"
+     r"favour(?:ing)? one leg|holding up (?:a|one) (?:leg|foot)", "foot rot"),
 )
 
 _SIGN_PATTERNS = tuple(

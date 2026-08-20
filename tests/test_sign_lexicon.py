@@ -53,6 +53,15 @@ MUST_FIRE = [
     ("newcastle disease", "The birds pass greenish watery droppings"),
     ("worms helminth", "My goat has a swollen jaw and a pot belly"),
     ("worms helminth", "The kid has bottle jaw and is very thin"),
+    # Bloat: answered with hoof-trimming advice, because "wet" appears in both
+    # the question and a footrot passage. It kills within hours.
+    ("bloat", "My goat left side is swollen and tight after grazing wet grass"),
+    ("bloat", "My cow is bloated after eating fresh lucerne"),
+    ("bloat", "The goat stomach is distended on one side"),
+    # Lameness: a single lame leg was diagnosed as foot-and-mouth disease, a
+    # notifiable disease the farmer would then go and report.
+    ("foot rot", "My goat is limping and will not put weight on one leg"),
+    ("foot rot", "One of my sheep is lame and stays behind the flock"),
 ]
 
 #: Ordinary in-scope questions. The first four are the dangerous ones: cassava
@@ -73,6 +82,10 @@ MUST_NOT_FIRE = [
     "The rains started late this year, what should I plant?",
     "How do I make compost from farm waste?",
     "My goat is not eating well",
+    # Bloat and lameness patterns must not reach ordinary swelling or movement
+    # language. "Bottle jaw" is swelling and belongs to worms, not bloat.
+    "How much space should each goat have to move around?",
+    "My cassava stems are swollen at the node",
 ]
 
 
@@ -101,3 +114,29 @@ def test_every_entry_has_a_probe() -> None:
         f"entries without a probe: {sorted(declared - probed)}; "
         f"probes for absent entries: {sorted(probed - declared)}"
     )
+
+
+def test_bloat_does_not_swallow_bottle_jaw() -> None:
+    """Both are swelling, and they are different diseases with different fixes.
+
+    Bottle jaw is oedema under the jaw from worms; bloat is gas distension of
+    the rumen on the left flank. A bloat pattern keyed on "swollen" alone would
+    take both, and would send a farmer with a wormy goat looking for a stomach
+    tube. The bloat entry requires the SIDE, which is what separates them.
+    """
+    for question in ("My goat has a swollen jaw and a pot belly",
+                     "The kid has bottle jaw and is very thin"):
+        got = sign_names(retrieval_query(question))
+        assert got == ["worms helminth"], f"{question!r} -> {got!r}"
+
+
+def test_lameness_does_not_fire_on_ordinary_movement_language() -> None:
+    """"Lame" and "limp" are specific; walking and space are not.
+
+    The scouring fix walked a bloated goat around on purpose; nothing here
+    should make ordinary husbandry advice look like a lameness question.
+    """
+    for question in ("How much space should each goat have to move around?",
+                     "Walk the animal around after feeding",
+                     "My goat is not eating well"):
+        assert "foot rot" not in sign_names(retrieval_query(question))

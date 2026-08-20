@@ -37,7 +37,13 @@ import re
 #: Weighted: some are unambiguous, others ("no", "go", "make") appear in
 #: English too and only count as evidence in combination.
 _STRONG = {"dey", "wey", "sabi", "abeg", "una", "dem", "comot", "wetin",
-           "waka", "chop", "oga", "biko", "naim", "dis", "dat", "di"}
+           "waka", "chop", "oga", "biko", "naim", "dis", "dat", "di",
+           # "My goat pikin dey shit water since morning" carried one strong
+           # marker ("dey") and no weak ones, so it fell one short of
+           # _MIN_STRONG and was detected as English. No normalisation ran, raw
+           # Pidgin went to retrieval, and the answer came back "retained
+           # placenta" for a kid with diarrhoea. These four are unambiguous.
+           "pikin", "pickin", "belle", "yansh"}
 _WEAK = {"na", "don", "no", "go", "make", "fit", "well well", "now now",
          "plenty", "small small"}
 

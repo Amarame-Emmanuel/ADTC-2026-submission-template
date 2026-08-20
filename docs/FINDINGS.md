@@ -10,13 +10,19 @@ Blocking problems are not filed here — those stop work and get raised directly
 
 | | finding | why it ranks here |
 |---|---|---|
-| **1** | **F-18** symptom returned as instruction | *"cut off seedlings at the base every night"* — new class, no guard covers it |
-| **2** | **F-15** fabricated claim, unmeasurable | a false vaccine claim; the grounding check cannot see this class |
-| **3** | **F-17** one document takes every slot | cap built, measured, reverted — coherence beat coverage |
-| **4** | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
+| — | **F-24** | **fixed — floor tolerance 0.05→0.08; the right passage was being discarded at 0.623 by 0.027** |
+| — | **F-23** | **fixed — polarity guard; both fabrications refuse, both correct Newcastle answers survive** |
+| **1** | **F-18** symptom returned as instruction | *"cut off seedlings at the base every night"* — guard built and tested, still uncommitted |
+| **2** | **F-15** fabricated claim, unmeasurable | the grounding check cannot see this class. **F-23 was its verified instance and is now guarded**; the general case is not |
+| 3 | **F-17** one document takes every slot | cap built, measured, reverted — coherence beat coverage |
+| 4 | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
 | 5 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
 | 6 | **F-20** topic drift | cutworm question answered damping-off too |
 | 7 | **F-21** livestock species leak | aquaculture passages in goat and chicken answers |
+| 8 | **F-27** out-of-scope crops cannot be demoted | **partly fixed — answer accuracy 90.9% → 97.0%, confirmed twice**; a doc titled by PATHOGEN still leaks |
+| 9 | **F-28** spurious model refusal on a clean question | ~17% of generations return "I'm sorry, but I can't assist with that"; reads as NOT_USED to the metric |
+| **1** | **F-30** refusal depends on the index, not the question | **19 of 40 out-of-scope prompts answered**; "who is the president of Nigeria" -> a false, cited claim |
+| — | **F-25**, **F-26** | **fixed — see below; F-26 is why a guard could be live for farmers and invisible to the metric** |
 | — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
 | — | **F-16**, **F-19**, **F-22**, F-03, **F-06**, F-07, F-08, **F-04**, **F-05**, **F-09**, **F-11**, **F-12** | resolved or disclosure-only, see below |
@@ -814,3 +820,366 @@ two changes that made answers worse and one that made them right.
 
 The answer-level checker helps but does not close this: it uses the same 70
 short questions. Framed variants remain unwritten.
+
+
+---
+
+## F-23 · A closed yes/no question invents its own polarity
+**Severity: high. Verified. New class — this is F-15 caught in the act.**
+
+> *"Is there any pesticide registered for cassava mealybug in Nigeria?"*
+> → *"**No, there is no pesticide registered for the cassava mealybug in
+> Nigeria.**"*
+
+The six passages retrieved for that question were pulled out and searched for
+`registered`, `approved`, `NAFDAC`, `licensed`. **None of the six contains any of
+them.** They are *Mealybugs (Phenacoccus manihoti)* and *Pest control in cassava
+farms* — biology and control, scoring 0.72–0.81, comfortably over the floor.
+
+The same question set produced a second instance:
+
+> *"Is there a cure for cassava mosaic disease?"* → *"**Yes**, there are several
+> methods to control cassava mosaic disease."*
+
+*Cure* appears in none of its six passages either. The advice that follows is
+correct control guidance; the **yes** is the model's, and it is wrong — a virus
+is controlled, never cured, and a farmer who believes otherwise will spend money
+trying to save an infected plant.
+
+**The mechanism.** A closed question demands a polarity the passages do not
+carry. Retrieval succeeds — six on-topic passages, floor cleared, nothing
+anywhere in the pipeline looks wrong — and the model supplies *yes* or *no* from
+the shape of the question rather than from the text. Open questions do not fail
+this way: *"how do I control mealybug"* has an answer in the passages to give.
+
+**Why no metric sees it.** `UNGROUNDED` fires when an expected term is missing
+from the sources. Here there is no expected term — the corpus has no position on
+registration status, so there is nothing to compare against. A claim with no
+counterpart in the corpus is structurally invisible to a check built on
+comparing against the corpus. `is_usable`, the score floor, `check_answer` and
+the compression stage all pass it cleanly.
+
+**Why refusal is the right answer to the first one.** §1 of the report already
+states that NAFDAC registration data is not openly published. The system is
+being asked something it has committed in writing to not knowing.
+
+**Not fixed.** The shape of a fix is a guard on closed questions: if the answer
+opens with a bare *yes* or *no* and the polarity-bearing term of the question
+(`registered`, `cure`, `vaccine`, `safe`) appears in none of the source
+passages, refuse rather than answer. That is testable and cheap. It is also
+untried, and F-01's history says untried retrieval-adjacent fixes measure worse
+about as often as better — so it is written down here, not shipped.
+
+**Countervailing evidence, recorded honestly:** two other closed questions in the
+same section came out right — *"Is there a vaccine for Newcastle disease?"* →
+*"Yes"*, and *"Can I treat Newcastle disease with antibiotics?"* → *"No"* (the
+most useful answer in the whole 63). Any guard would need to leave both alone.
+
+**Relationship to F-15, corrected.** I first wrote that the vaccine answer
+contradicted what the system said "a day earlier", implying the failure was
+intermittent. That was wrong twice over. F-15's instance came from a *different*
+question — *"My chickens have twisted necks and greenish diarrhoea"* — on
+**2026-08-15**, not from the closed vaccine question, and not a day earlier.
+Re-running that actual question five times on the current build gives **5/5
+clean**. Two retrieval commits landed in between (`8ab5bfb`, `efcab22`), so the
+likely explanation is that they changed what it retrieves, not sampling noise.
+F-23 rests on its own two verified instances; it needs no support from F-15.
+
+### F-24 · Livestock advice for the wrong condition
+**Severity: dangerous. The only finding in this file where following the advice
+costs an animal.**
+
+> *"My kid goats are scouring with watery dung"*
+> → *"change the feeding space to 35 cm at least per mature goat and to walk the
+> animal around to encourage belching."*
+
+That is **bloat** management, retrieved for a question about **diarrhoea**.
+Scouring in kids is coccidiosis or worms, and it kills through dehydration. The
+answer names no cause, mentions no fluids, no isolation, no vet, and prescribes
+walking — which does nothing for a scouring kid and costs the hours that matter.
+
+Both conditions are goat digestive complaints, so they sit close in embedding
+space and the dense side of retrieval cannot separate them. This is F-21's
+species leak one level down: **same species, wrong condition**, and harder to
+catch because nothing in the answer is off-topic.
+
+The sign lexicon (`_SIGN_TO_NAME`) is the existing machinery for exactly this
+problem — it maps what a farmer sees to what the corpus calls it, and it is what
+fixed the mealybug misidentification. It has no entry for *scouring*, *watery
+dung*, or *diarrhoea*. Adding one, pointing at coccidiosis and helminth, is the
+narrowest available fix and follows a pattern already measured at +6.0 points.
+
+**Not fixed** — the lexicon change is small, but every entry needs measuring
+against the dev split before it ships, and the measurement has not been run.
+
+---
+
+## F-25 · The questionnaire filter tested for the wrong thing
+**Severity: medium. FIXED. Found while fixing F-24, not by any metric.**
+
+`is_question_checklist` requires two second-person interrogatives ("have you",
+"do you") alongside a run of consecutive questions. That was written for a
+business-plan workbook, which quizzes the reader directly.
+
+It made the rule **inert for an exam**. A yam-disease research guide ends with
+
+    Questionnaire 1 Where are yams cultivated? 2 What are the major cultivated
+    yam species grown in West Africa? 3 What are climatic requirements for yam
+    cultivation? ... 13 Which nematodes ...
+
+Thirteen consecutive unanswered questions, not one addressed to a reader,
+`is_question_checklist` returning **False**, `is_usable` returning **True**, and
+the passage taking a retrieval slot from a farmer asking why their tubers were
+rotting.
+
+Person was a proxy for "put TO the reader". The unbroken run is the direct
+evidence, because an FAQ alternates question and answer by definition. Above
+`_LONG_QUESTION_RUN = 5` the person test is now skipped; below it, it still
+governs, so genuine FAQ material is untouched. Both directions are pinned in
+`tests/test_quality.py`.
+
+### F-26 · `advise()` never ran the guards `guarded_stream` carries
+**Severity: high, structural. FIXED. The reason it matters is the direction.**
+
+`stream()` and the web server both funnel through `guarded_stream`. `advise()`
+does not - it calls `llm.complete` directly. This file already carries a long
+comment about the web server having diverged from the tested path; the same
+defect existed again, pointing the other way.
+
+**`advise()` is what the evaluation harness calls.** So a guard added to
+`guarded_stream` would have been live for every farmer and invisible to every
+measurement - `bench/answers.py` would have scored a system nobody runs. The
+polarity guard and the prompt-echo stop sequences are now applied on both paths,
+and the duplication carries a comment saying why it is not shared.
+
+Worth stating plainly: this was found by adding a guard and noticing the metric
+did not move, not by a test. There is still no test asserting that the two paths
+apply the same guards.
+
+### F-27 · Passages about out-of-scope crops cannot be demoted
+**Severity: medium - OPEN, diagnosed, not yet fixed.**
+
+`_demote_off_crop` partitions candidates using `CROP_TERMS`, which lists the
+**nine in-scope crops**. A passage about a crop that is neither asked about nor
+in scope - bean, papaya - matches nothing, is classified NEUTRAL, and is
+therefore never demoted. The docstring's "neutral counts as on-topic,
+deliberately" was written about passages naming *no* crop; it silently also
+covers passages naming a crop the vocabulary has never heard of.
+
+Two known defects reduce to this one:
+
+- *"My rice leaves have orange-brown spots"* retrieves **Bean Leaves (New)
+  (Helicoverpa armigera)** at 0.719 and answers with *angular leaf spot caused
+  by Phaeoisariopsis griseola* - a bean disease. The correct answer, brown leaf
+  spot (*Bipolaris oryzae*), is in the corpus and was retrieved.
+- `crop-22`, the one remaining coverage gap, retrieves **Papaya (Revised)
+  (Aphis gossypii)** for a tomato leafminer question.
+
+`scope.OUT_OF_SCOPE_CROPS` already exists for questions and lists 17 crops -
+**neither bean nor papaya among them**. The shape of a fix is to give
+`_demote_off_crop` a second vocabulary of other-crop terms so such passages sort
+behind on-crop ones. Demotion, not exclusion, keeps the *Whiteflies* case that
+forced the original design.
+
+**Attempted. Partially works.** `OTHER_CROP_TERMS` was added and
+`_demote_off_crop` now demotes a passage whose TITLE names an out-of-scope crop.
+The title, not the body, because extension documents mention other crops
+constantly - intercrops, rotations, comparisons - and demoting on a body mention
+would push out most of the corpus.
+
+Result: **"Papaya (Revised)" is gone** from crop-22, which now retrieves a tomato
+document. **"Bean Leaves (New)" is gone** from the rice question.
+
+**Measured, twice: answer accuracy 90.9% -> 97.0%.** `crop-13` and `crop-22` both
+went NOT_USED -> OK, in both post-change runs, having been NOT_USED in both
+pre-change runs. Four runs, two questions, no disagreement; coverage and refusal
+unchanged. This is the only change of the seven that moved the metric, and the
+mechanism matches the diagnosis - both questions were losing slots to documents
+about crops `CROP_TERMS` could not see, and both were NOT_USED rather than
+MISSED, meaning the evidence was already reaching the context and being crowded
+out of attention.
+
+The size of the gain is worth a caution: it is 2 questions out of 33 on a 70-
+question evaluation set, in an area (F-01, F-14) where four previous approaches
+measured worse. It should not be read as a general improvement in retrieval.
+
+**But the rice answer is still wrong**, and the reason is the limit of the fix:
+the same bean material returned under the title *"Angular leaf spots
+(Phaeoisariopsis griseola)"* - named for the DISEASE, not the crop - and a
+title-keyed rule is blind to it. Extending the vocabulary to scientific names
+would be endless; the honest description is that this fix catches documents that
+announce their crop and misses documents that announce their pathogen.
+
+The rice failure has also changed KIND. It no longer asserts the bean diagnosis;
+it now declines to diagnose at all, while three *Rice (Revised)* passages sit
+unused in context. That makes it a NOT_USED failure - the F-14 family - rather
+than a retrieval one, and it is not addressed here.
+
+### F-28 · A legitimate question spuriously refuses ~17% of the time
+**Severity: medium — OPEN. Found by bisecting a metric movement, not by a probe.**
+
+`crop-22` ("There are white winding lines inside my tomato leaves") sometimes
+answers with a correct leafminer diagnosis and sometimes returns, in full:
+
+    I'm sorry, but I can't assist with that.
+
+That is not any of this system's refusal messages. It is the MODEL emitting a
+policy-style refusal for a tomato pest question, and it arrives with six good
+passages in context - slot 1 is *Leafmining flies (Leafminers)*, scoring 0.760
+and mentioning tomato.
+
+**Measured, 12 generations per arm:**
+
+| build | leafminer named |
+|---|---|
+| with out-of-scope crop demotion | 10/12 |
+| without it | 10/12 |
+
+Identical rate, identical failure text. So the refusal is a property of the
+question and the model, not of any retrieval change.
+
+**Why it matters beyond one question.** It is invisible to `UNGROUNDED` and to
+coverage, and it reads to the answer-level checker as `NOT_USED` - "the evidence
+was there and the model ignored it" - which is true but badly misleading. The
+model did not ignore the evidence; it declined to answer at all. Those want
+different fixes, and the metric cannot tell them apart.
+
+**How it distorted a measurement.** Two consecutive sweeps scored 93.9% against
+two earlier sweeps at 97.0%, and the whole difference was this one question
+landing on its ~17% failure side twice running. At p=0.17 that is a 2.8% event,
+which is exactly often enough to be mistaken for a regression. It nearly caused
+a working fix to be reverted.
+
+**The lesson for this project's method.** Answer accuracy over 33 questions moves
+in 3.0-point steps, and at least one of those questions is a coin with a 17%
+edge. A single sweep cannot distinguish a one-question regression from noise;
+re-running the single question N times can, costs a fraction as much, and is now
+how any one-question movement should be checked before acting on it.
+
+**Not fixed.** The cause is unknown - nothing in the question is remotely
+sensitive. Worth checking whether a passage in context carries language the
+model reads as a policy trigger.
+
+### F-29 · Five attempts to raise S_total, all measured, all reverted
+**Severity: n/a — this is a negative result, recorded so it is not re-run.**
+
+Measured 2026-08-19/20 on the profiler's own scalar llama.cpp build
+(`adtc-llamabench`, `GGML_AVX/AVX2/AVX512/FMA/F16C/BLAS=OFF`), invoked exactly as
+the audit does: `llama-bench -p 512 -n 128 -ngl 0 -t 4 -r 5`.
+
+| model / format | file | tg128 tok/s |
+|---|---|---|
+| Qwen2.5-**0.5B** Q4_0 | 403 MiB | **74.51 ± 8.79** |
+| **Qwen2.5-1.5B Q4_0 (shipped)** | 1011 MiB | **30.07 ± 0.58** |
+| SmolLM2-1.7B Q4_0 | 946 MiB | 26.33 ± 2.24 |
+| Llama-3.2-1B Q4_0 | 730 MiB | 25.89 ± 3.35 |
+| Qwen2.5-0.5B Q4_K_M | 463 MiB | 22.89 ± 2.29 |
+| Qwen2.5-1.5B Q4_K_M | 1.04 GiB | 16.23 ± 1.01 |
+| Qwen2.5-1.5B IQ4_XS | 849 MiB | 8.21 ± 0.39 |
+| Qwen2.5-1.5B Q5_0 | 1.17 GiB | 5.72 ± 0.13 |
+
+**Parameter count does not predict scalar throughput.** Llama-3.2-1B has 1.24 B
+parameters against Qwen2.5-1.5B's 1.78 B and is *slower* (25.89 vs 30.07);
+SmolLM2-1.7B is slower too. The search for a "middle path" model - smaller than
+1.5B, faster, still capable - was the most promising idea on the list and it has
+no candidate. Both were reverted.
+
+**Q4_0 is confirmed optimal, and the margin over Q4_K_M is smaller than §3.3b
+states.** Measured here 30.07 vs 16.23 = **1.85x**, not the 2.7x in the report.
+Direction unchanged, magnitude overstated. Q5_0 was probed on the theory that a
+simple non-K quant might also be fast: it is the slowest of all eight at 5.72.
+
+**The 0.5B is rejected on evidence, not on principle.** It is genuinely 2.5x
+faster and saves 0.68 GB (peak RSS 0.95 vs 1.63 GB, `S_eff` 86.4 vs 76.7). On
+the published formula the swap scores roughly **+13 `S_total`**. It is still not
+shippable:
+
+- ARC-Easy, 200 samples, **Q4_0**: `acc` **0.545** / `acc_norm` **0.530**, against
+  the 1.5B's 0.685 / 0.695. That is **-14 pp**, worth -7.0 `S_total`. The 0.610
+  figure quoted previously was Q4_K_M and flattered it by 6.5 points.
+- The submitted cassava prompt returns *"cassava brown streak disease"*. Yellow,
+  twisted and stunted is **mosaic**; brown streak is a different disease with
+  different symptoms, and this is the demo prompt.
+- *"My kid goats are scouring with watery dung"* returns **the system prompt,
+  verbatim**: *"The sources below were selected because they are relevant.
+  Answer from them directly. Do not begin by saying you lack information."*
+- The Newcastle question returns a numbered list of source titles plus a stray
+  mention of **Marek's disease**.
+
+Three of four demo questions broken. §3.3's qualitative rejection of the 0.5B
+was made on Q4_K_M at n=50; this re-tests it on the shipped quant at n=200 and
+the conclusion holds harder than before.
+
+**`n_ctx` 2048 -> 1536** was measured at 1.62 GB against 1.63 - **+0.03
+`S_total`** - while cutting worst-case headroom from 763 spare tokens to 251.
+Reverted: not worth a truncation risk on a long framed question.
+
+**Conclusion.** `S_eff` (1.63 GB) and `S_perf` (30.07 tok/s) are both at the
+ceiling for this architecture, and `S_acc` is bounded by the best of eight
+models. The only untested lever is whether ARC-Easy is the whole of `S_acc` or
+only its automated half; if a judged half exists it is worth ~25% of the total
+score, and it is the one place remaining where the retrieval work pays.
+
+### F-30 · Refusal is a property of the index, not of the question
+**Severity: HIGH — OPEN. 19 of 40 out-of-scope prompts were answered.**
+
+Full detail in `docs/UI_REVIEW_OOS.md`. Forty prompts outside the declared scope
+- nine crops plus goats, cattle, sheep and poultry - were put through `/ask` on
+2026-08-20. **21 refused, 19 answered: a 47.5% failure rate.**
+
+Of the 21 correct refusals, only **6 came from a scope rule**. Fifteen came from
+the **retrieval floor** - the system declined because the corpus held nothing
+above 0.70, not because it recognised the question as out of jurisdiction.
+
+**The two-line proof:**
+
+| prompt | corpus content | outcome |
+|---|---|---|
+| *"What is the capital of Kenya?"* | nothing | refused at floor, 0.1 s |
+| *"Who is the president of Nigeria?"* | one passing mention | **answered** |
+
+Nothing distinguishes those in scope terms. Both are general knowledge. The only
+difference is whether a string happened to be in the index.
+
+**The worst instance.** *"Who is the president of Nigeria?"* returns *"The
+president of Nigeria is Muhammadu Buhari. [1]"* - out of scope, **factually
+false** (Buhari left office in May 2023), and **cited**, so a fabricated
+political claim borrows the corpus's authority. It clears the floor on a single
+passage, presumably a policy foreword. No existing guard has any view on whether
+an answer is about farming: `check_answer` looks for hazardous actives and
+dosages, `sources_cannot_settle` fires only on regulatory questions, `UNGROUNDED`
+compares against expected terms.
+
+**Where it fails hardest.** Adjacent farming domains, 7 of 7 answered - catfish,
+bees, dogs, rabbits, firewood trees, snails, mushrooms. The catfish answer comes
+from the *Climate Smart Aquaculture* document that F-21 already records leaking
+into goat and chicken answers; here it answers a fish question outright. The dog
+answer recommends acaricides for a **companion animal** from livestock material,
+where the withdrawal-period logic that protects food animals does not apply.
+
+Geography, 4 of 4 answered. *"When should I plant maize in Scotland?"* invents a
+planting month: *"in Scotland, this usually occurs around late March or early
+April."* `AFRICA_TERMS` filters the **corpus** by region; nothing filters the
+**question**.
+
+Crops, 3 of 8 answered - pineapple, watermelon, mango. `OUT_OF_SCOPE_CROPS` is an
+enumeration of 17 names and those three are not on it. The five that *are*
+listed refused correctly in 0.0 s. **The list works; being a list is the
+problem.**
+
+**Why this matters more than the individual cases.** The seven scope rules are
+all TOPIC rules - dosage, price, forecast, medical, financial, mechanical,
+out-of-scope crop. None answers the prior question: *is this about farming the
+nine crops and four species at all?* Everything else falls to the floor, and the
+floor was calibrated for relevance, not jurisdiction.
+
+So the failure rate is not fixed - **it grows with the corpus.** Every document
+added makes more out-of-scope questions clear the floor. That directly opposes
+§3's "bigger corpus, smaller model" recommendation on this one axis, and the
+opposition was not visible until out-of-scope input was tested deliberately.
+
+**Not fixed.** The shape of a fix is an in-domain gate ahead of retrieval -
+cheap, testable, and the inverse of every existing rule: instead of enumerating
+what to refuse, require evidence of what to accept. Section 6 of the review
+records what already works and must not regress: 4/4 on meta-questions, 4/5 on
+nonsense, 6/6 on general knowledge, 5/5 on the listed crops.

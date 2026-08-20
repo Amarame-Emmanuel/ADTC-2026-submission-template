@@ -74,11 +74,12 @@ def _terms_present(text: str, terms: list[str]) -> list[str]:
     return [t for t in terms if t.lower() in low]
 
 
-def evaluate(split: str = "dev", limit: int | None = None) -> dict:
+def evaluate(split: str = "dev", limit: int | None = None,
+             questions_path: str | None = None) -> dict:
     from agbe.advisor import AdvisoryEngine
     from bench.coverage import load_questions
 
-    questions = load_questions(split)
+    questions = load_questions(split, questions_path)
     in_scope = [q for q in questions if q.get("in_scope")]
     out_scope = [q for q in questions if not q.get("in_scope")]
     if limit:
@@ -209,11 +210,14 @@ def main() -> int:
     ap.add_argument("--split", choices=("dev", "test", "all"), default="dev",
                     help="dev for iterating; test once, at the end")
     ap.add_argument("--limit", type=int, help="first N in-scope questions only")
+    ap.add_argument("--questions",
+                    help="alternative question file; read whole, ignoring --split")
     ap.add_argument("--save", action="store_true")
     ap.add_argument("--out", default="answers.json")
     args = ap.parse_args()
 
-    result = evaluate(split=args.split, limit=args.limit)
+    result = evaluate(split=args.split, limit=args.limit,
+                      questions_path=args.questions)
     print_report(result)
 
     if args.save:

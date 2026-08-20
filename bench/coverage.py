@@ -47,7 +47,7 @@ TARGET_COVERAGE = 0.80
 TARGET_REFUSAL = 0.80
 
 
-def load_questions(split: str = "dev") -> list[dict]:
+def load_questions(split: str = "dev", path: "Path | None" = None) -> list[dict]:
     """Load the evaluation questions for one side of the split.
 
     Defaults to `dev` on purpose. Tuning is the common case, and a default of
@@ -56,6 +56,14 @@ def load_questions(split: str = "dev") -> list[dict]:
     for `--split test` explicitly.
     """
     from bench.split import split_questions
+
+    # An alternative question file is always read whole. The dev/test split is
+    # a hash over the ids in eval_questions.json; applying it to a different
+    # file would silently discard half of a set whose whole purpose is to be
+    # small and adversarial. bench/probe_questions.json is the case this exists
+    # for - see its `purpose` field.
+    if path is not None:
+        return json.loads(Path(path).read_text(encoding="utf-8"))["questions"]
 
     if split == "all":
         return json.loads(QUESTIONS_PATH.read_text(encoding="utf-8"))["questions"]
@@ -124,9 +132,10 @@ def machine_label() -> dict:
     return info
 
 
-def evaluate(min_score: float, top_k: int, split: str = "dev") -> dict:
+def evaluate(min_score: float, top_k: int, split: str = "dev",
+             questions_path: "Path | None" = None) -> dict:
     index = VectorIndex.load()
-    questions = load_questions(split)
+    questions = load_questions(split, questions_path)
 
     in_scope = [q for q in questions if q["in_scope"]]
     out_scope = [q for q in questions if not q["in_scope"]]
@@ -320,6 +329,7 @@ def main() -> int:
                     help="dev for tuning (default); test is the reported number")
     ap.add_argument("--sweep", action="store_true",
                     help="try a range of min_score values and show the trade-off")
+    ap.add_argument("--questions", help="alternative question file; read whole, ignoring --split")
     ap.add_argument("--save", action="store_true", help="write results JSON")
     args = ap.parse_args()
 
@@ -354,7 +364,8 @@ def main() -> int:
                   f"{r['refusal']['value']:>10.1%}")
         return 0
 
-    report = evaluate(args.min_score, args.top_k, split=args.split)
+    report = evaluate(args.min_score, args.top_k, split=args.split,
+                      questions_path=args.questions)
     report["split"] = args.split
     print_report(report)
 

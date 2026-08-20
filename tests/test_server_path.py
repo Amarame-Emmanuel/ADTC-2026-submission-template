@@ -69,7 +69,7 @@ class StubEngine:
                           score=0.81, rank=0)]
         return hits, ["Goats need fresh forage twice daily."], {"tokens_after": 12}
 
-    def guarded_stream(self, question, hits, texts):
+    def guarded_stream(self, question, hits, texts, no_guidance=None):
         self.calls.append("guarded_stream")
         for piece in self.pieces:
             yield piece, None

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T12:07:31+00:00",
+  "generated_at": "2026-08-20T12:22:21+00:00",
   "machine": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
     "processor": "x86_64",
@@ -17,27 +17,32 @@
     "n_documents": 995
   },
   "coverage": {
-    "value": 1.0,
+    "value": 0.9697,
     "target": 0.8,
     "pass": true,
-    "covered": 28,
-    "total": 28
+    "covered": 32,
+    "total": 33
   },
   "refusal": {
     "value": 1.0,
     "target": 0.8,
     "pass": true,
-    "refused": 8,
-    "total": 8
+    "refused": 9,
+    "total": 9
   },
   "retrieval_latency_ms": {
-    "p50": 78.92,
-    "p95": 93.26
+    "p50": 116.77,
+    "p95": 136.93
   },
   "per_crop": {
     "cassava": {
-      "covered": 5,
-      "total": 5,
+      "covered": 7,
+      "total": 7,
+      "coverage": 1.0
+    },
+    "cattle": {
+      "covered": 2,
+      "total": 2,
       "coverage": 1.0
     },
     "cowpea": {
@@ -46,18 +51,8 @@
       "coverage": 1.0
     },
     "general": {
-      "covered": 2,
-      "total": 2,
-      "coverage": 1.0
-    },
-    "goat": {
-      "covered": 3,
-      "total": 3,
-      "coverage": 1.0
-    },
-    "groundnut": {
-      "covered": 3,
-      "total": 3,
+      "covered": 8,
+      "total": 8,
       "coverage": 1.0
     },
     "maize": {
@@ -70,28 +65,41 @@
       "total": 1,
       "coverage": 1.0
     },
-    "poultry": {
+    "pepper": {
       "covered": 2,
       "total": 2,
       "coverage": 1.0
     },
-    "rice": {
+    "poultry": {
       "covered": 1,
       "total": 1,
+      "coverage": 1.0
+    },
+    "rice": {
+      "covered": 2,
+      "total": 2,
       "coverage": 1.0
     },
     "tomato": {
+      "covered": 3,
+      "total": 4,
+      "coverage": 0.75
+    },
+    "yam": {
       "covered": 1,
       "total": 1,
       "coverage": 1.0
-    },
-    "yam": {
-      "covered": 5,
-      "total": 5,
-      "coverage": 1.0
     }
   },
-  "gaps": [],
+  "gaps": [
+    {
+      "id": "crop-22",
+      "topic": "leaf miner",
+      "question": "There are white winding lines inside my tomato leaves",
+      "reason": "retrieved, but not about the right thing",
+      "got": "Cultivation of tomato: production, processing and marketing"
+    }
+  ],
   "false_positives": [],
-  "split": "test"
+  "split": "dev"
 }

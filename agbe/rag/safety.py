@@ -203,6 +203,7 @@ class SafetyVerdict:
     stale_chemical_sources: list[str] = field(default_factory=list)
     restricted_veterinary: list[str] = field(default_factory=list)
     missing_withdrawal_warning: bool = False
+    foreign_currency: list[str] = field(default_factory=list)
 
     def as_notice(self, language: str = "en") -> str:
         """Farmer-facing text appended to an answer when something was caught.
@@ -242,6 +243,13 @@ class SafetyVerdict:
                 "restricted in food-producing animals ("
                 + ", ".join(sorted(self.restricted_veterinary))
                 + "). Do not use them. Ask a veterinary officer."
+            )
+        if self.foreign_currency:
+            lines.append(
+                "Some figures above are in a currency from another country ("
+                + ", ".join(sorted(self.foreign_currency))
+                + "). They are not Nigerian prices and should not be used to "
+                + "decide what to sell for. Ask at your local market."
             )
         if self.missing_withdrawal_warning:
             lines.append(msg.withdrawal_period)
@@ -295,6 +303,49 @@ def is_source_stale(year: str, now: int | None = None) -> bool:
     return (current - published) > CHEMICAL_RECENCY_YEARS
 
 
+#: Money in a currency a Nigerian farmer does not sell in.
+#:
+#: Asked "what do traders pay for a bag of maize these days?", the system
+#: answered "Traders generally pay farmers between KSh$81.21 and KSh$517 per
+#: 50 kg bag... In Bungoma, farmers are willing to pay an average of KSh$87."
+#: Those are Kenyan shillings from a CGIAR baseline study in Uasin Gishu and
+#: Bungoma, presented without qualification to a farmer in southwest Nigeria.
+#:
+#: The scope rule now refuses that particular question, but the underlying
+#: exposure is broader: AFRICA_TERMS admits Kenyan, Ugandan and Malawian
+#: material on purpose - it is good agronomy - and any of it can carry local
+#: money. Agronomy travels across borders; prices do not.
+#:
+#: A notice rather than a redaction. The figure may be the only quantitative
+#: anchor in the answer, and deleting it silently would leave a sentence that
+#: reads as though it said something. The farmer is told whose money it is.
+_FOREIGN_MONEY = re.compile(
+    r"(?<![A-Za-z])("
+    r"K\.?Sh|KES|TZS|UGX|ZMW|MWK|GH\.?S|XOF|XAF|ZAR|USD|"
+    r"(?:kenyan|tanzanian|ugandan|zambian|malawian|ghanaian|south african)\s+"
+    r"(?:shillings?|kwacha|cedis?|rand)|"
+    r"shillings?|kwacha|cedis?"
+    r")(?![A-Za-z])",
+    re.IGNORECASE,
+)
+
+#: How far from the currency token a number may sit. "120 000 TZS" puts the
+#: amount before the code; "KSh 87" puts it after. Requiring a number at all is
+#: what keeps "Randomised plots" and "the brand of fertiliser" out - a currency
+#: name with no figure beside it is prose, not a price.
+_MONEY_WINDOW = 14
+
+
+def find_foreign_money(text: str) -> list[str]:
+    """Non-Naira currency tokens that appear next to a number."""
+    found: set[str] = set()
+    for m in _FOREIGN_MONEY.finditer(text):
+        lo = max(0, m.start() - _MONEY_WINDOW)
+        window = text[lo:m.end() + _MONEY_WINDOW]
+        if any(ch.isdigit() for ch in window):
+            found.add(m.group(1).strip())
+    return sorted(found)
+
 def check_answer(
     answer: str,
     source_texts: list[str],
@@ -314,6 +365,11 @@ def check_answer(
     hazardous = find_hazardous_actives(answer) or find_hazardous_actives(combined_sources)
     if hazardous:
         verdict.hazardous_found = hazardous
+        verdict.safe = False
+
+    foreign = find_foreign_money(answer)
+    if foreign:
+        verdict.foreign_currency = foreign
         verdict.safe = False
 
     for dosage in find_dosages(answer):

@@ -102,6 +102,7 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
         # under test had both. Divergence between the demo path and the tested
         # path is its own kind of defect.
         from agbe.rag import scope
+        from agbe.translate.pidgin_norm import for_retrieval as pidgin_for_retrieval
         from agbe.translate.detect import detect
         from agbe.translate.messages import get as get_messages
 
@@ -114,13 +115,26 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
 
         yield sse("language", {"language": language})
 
-        verdict = scope.check(question.text)
+        # Scope is checked against the NORMALISED question.
+        #
+        # Every policy rule in scope.py - dosage, live price, forecast, human
+        # medical - is written in English, and scope.check() was being handed
+        # the raw text. So the rules were written against a language they were
+        # never shown. Measured: "How much dem dey sell garri for market now?"
+        # passed scope.check() untouched and refused only because retrieval
+        # happened to find nothing above the floor; normalised first, the price
+        # rule fires correctly. Same for "Abeg how much dem dey sell maize now?".
+        #
+        # English passes through pidgin_for_retrieval byte-identically, so the
+        # English path - and every measurement taken on it - is unchanged.
+        verdict = scope.check(pidgin_for_retrieval(question.text))
         if not verdict.in_scope:
             yield sse("refused", {
                 "message": engine._scope_message(verdict, messages),
                 "reason": verdict.reason,
+                "layer": "scope",
             })
-            yield sse("done", {"refused": True})
+            yield sse("done", {"refused": True, "layer": "scope"})
             return
 
         yield sse("stage", {"stage": "retrieving"})
@@ -139,8 +153,29 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
             # The refusal path. Emitted as its own event so the interface can
             # present it as a deliberate answer rather than an error or an
             # empty response.
-            yield sse("refused", {"message": messages.no_guidance})
-            yield sse("done", {"refused": True})
+            # `layer` says WHICH mechanism refused. Fourteen of forty-nine probe
+            # questions refused, from three different mechanisms with three
+            # different fixes, and neither the interface nor the logs recorded
+            # which - every attribution had to be reconstructed by re-running the
+            # question against each layer by hand.
+            yield sse("refused", {"message": messages.no_guidance, "layer": "floor"})
+            yield sse("done", {"refused": True, "layer": "floor"})
+            return
+
+        # A closed question the passages cannot settle is refused here, BEFORE
+        # the sources event, not left to guarded_stream.
+        #
+        # guarded_stream carries the same guard and would catch this anyway, but
+        # by then the browser has already been handed six citations. The farmer
+        # would read "I do not have local guidance on that in my documents"
+        # sitting directly beneath six sources - which reads as a bug, and
+        # undermines the one thing the refusal is trying to say.
+        from agbe.advisor import sources_cannot_settle
+
+        if sources_cannot_settle(question.text, [h.chunk.text for h in hits]):
+            yield sse("refused", {"message": messages.no_guidance,
+                                  "layer": "polarity", "reason": unsettled})
+            yield sse("done", {"refused": True, "layer": "polarity"})
             return
 
         # Sources first: they are ready now, and they give the farmer
@@ -163,7 +198,9 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
         answer_parts: list[str] = []
         stats = None
 
-        for piece, piece_stats in engine.guarded_stream(question.text, hits, texts):
+        for piece, piece_stats in engine.guarded_stream(
+            question.text, hits, texts, no_guidance=messages.no_guidance
+        ):
             if piece_stats is not None:
                 stats = piece_stats
             answer_parts.append(piece)

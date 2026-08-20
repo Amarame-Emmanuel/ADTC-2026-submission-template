@@ -96,6 +96,10 @@ from agbe.rag.safety import (
 # A future attempt should change how sources are PRESENTED - six numbered blocks
 # is what invites six numbered blocks back - rather than instructing the model
 # to summarise less.
+#: Strings from the prompt itself. If generation emits one, it has stopped
+#: answering and started reproducing its own input - see guarded_stream.
+PROMPT_ECHO_STOPS = ["Farmer's question:", "\nSources:"]
+
 SYSTEM_PROMPT = """You advise smallholder farmers in southwest Nigeria on crops \
 and livestock.
 
@@ -182,6 +186,120 @@ def strip_false_disclaimer(answer: str) -> tuple[str, bool]:
         if cleaned:
             cleaned = cleaned[0].upper() + cleaned[1:]
     return (cleaned or answer), stripped
+
+#: Words too common to count as evidence that a sentence echoes the question.
+_ECHO_STOPWORDS = frozenset("""
+a an and are as at be been being but by can do does for from had has have how
+i if in into is it its me my of on or our should so that the their them then
+there these they this to too very was were what when where which who will with
+you your
+""".split())
+
+#: TWO overlaps, measured in opposite directions, and both are needed.
+#:
+#: The first version measured only "how much of the sentence came from the
+#: question" and missed the defect entirely: "For cutworms, cut off seedlings at
+#: the base every night" scored 0.71, because "cutworms" and "off" dilute it.
+#:
+#: RECALL - how much of the farmer's description is handed back. This is the
+#: actual signal: the cutworm sentence reproduces every content word of the
+#: question, 5 of 5.
+ECHO_QUESTION_RECALL = 0.8
+
+#: PRECISION - how much of the sentence is nothing but the question. Needed
+#: because recall alone deletes real advice: for "my maize is yellow", the
+#: instruction "use nitrogen fertiliser on maize that is yellow" also covers the
+#: whole question, and is exactly right. It survives because only 2 of its 5
+#: content words are the farmer's; the cutworm sentence has 5 of 7.
+#:
+#: An echo says the question back and adds nothing. Advice says it back and adds
+#: what to do.
+ECHO_SENTENCE_SHARE = 0.6
+
+#: An instruction: an imperative opening, or an explicit directive to the reader.
+#: A sentence describing symptoms is not one, however closely it echoes.
+_IMPERATIVE = re.compile(
+    r"^\s*(?:for [^,]{1,30},\s*)?(?:you (?:should|must|can|need to)\s+)?"
+    r"(?:cut|remove|uproot|destroy|burn|bury|apply|spray|plant|sow|harvest|"
+    r"store|sell|water|feed|treat|inject|collect|handpick|pick|rogue|prune|"
+    r"weed|dig|leave|keep|avoid|stop|start|use|make|check|inspect|monitor)\b",
+    re.IGNORECASE,
+)
+
+
+def _content_words(text: str) -> set[str]:
+    return {
+        w for w in re.findall(r"[a-z]+", text.lower())
+        if len(w) > 2 and w not in _ECHO_STOPWORDS
+    }
+
+
+def strip_symptom_echo(answer: str, question: str) -> tuple[str, list[str]]:
+    """Remove instructions that are the farmer's own symptom handed back.
+
+    Asked "my seedlings are cut at the base every night", the system answered,
+    among other things:
+
+        "For cutworms, cut off seedlings at the base every night."
+
+    A farmer following that would destroy their crop. It is not a bad fact from
+    a source and not a fabrication - no source says it. The model re-emitted the
+    QUESTION as an imperative, and nothing in this system was looking for that:
+    `is_usable` filters passages, `check_answer` looks for hazardous actives and
+    unsupported dosages, `strip_false_disclaimer` matches one specific opening.
+    None of them compares the answer against what was asked.
+
+    TWO CONDITIONS, BOTH REQUIRED
+    -----------------------------
+    Overlap alone is not the signal. Good answers echo the question constantly,
+    because naming the problem back to the farmer is how a diagnosis reads:
+
+        "Your cassava leaves are yellow and twisted because of mosaic disease"
+
+    That is nearly all the farmer's words and it is exactly right. What makes
+    the cutworm sentence a defect is that it is an INSTRUCTION - it tells them
+    to do the thing they are complaining about.
+
+    So a sentence is removed only when it is imperative AND both overlap tests
+    pass: ECHO_QUESTION_RECALL of the question's content words are returned, and
+    ECHO_SENTENCE_SHARE of the sentence is nothing but those words. Descriptions,
+    diagnoses and explanations are untouched however much they echo, because
+    they are not instructions.
+
+    Returns (cleaned, removed) so the rate is measurable. A rising count means
+    the prompt or the retrieval is drifting and should be fixed at the source,
+    exactly as with strip_false_disclaimer.
+    """
+    asked = _content_words(question)
+    if not asked:
+        return answer, []
+
+    kept: list[str] = []
+    removed: list[str] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", answer):
+        words = _content_words(sentence)
+        if not words or not _IMPERATIVE.match(sentence):
+            kept.append(sentence)
+            continue
+
+        shared = words & asked
+        recall = len(shared) / len(asked)          # of the question, how much returned
+        share = len(shared) / len(words)           # of the sentence, how much is question
+
+        if recall >= ECHO_QUESTION_RECALL and share >= ECHO_SENTENCE_SHARE:
+            removed.append(sentence.strip())
+            continue
+        kept.append(sentence)
+
+    if not removed:
+        return answer, []
+
+    cleaned = " ".join(s for s in kept if s.strip()).strip()
+    # Never return an empty answer: a truncated answer is worse than an odd one,
+    # and if echo removal would take everything, the right response is to leave
+    # the original and let the rate reporting show it.
+    return (cleaned or answer), removed
+
 
 NO_GUIDANCE_MESSAGE = (
     "I do not have local guidance on that in my documents, so I cannot give you "
@@ -301,6 +419,85 @@ def build_prompt(
     ]
 
 
+#: Regulatory status: the one thing a closed question can ask that this corpus
+#: can NEVER settle, whatever it happens to contain.
+#:
+#: WHY THIS IS NOW A CATEGORY TEST AND NOT A CONTAINMENT TEST
+#: The first version asked whether the word the question turned on appeared
+#: anywhere in the retrieved passages. That was wrong in both directions, and
+#: the probe set caught both within one run.
+#:
+#: TOO WEAK - "Is glyphosate approved for use on maize in Nigeria?" answered
+#:            "Yes, glyphosate is approved for use on maize in Nigeria, as
+#:            indicated by the Maize-legume cropping guide." The stem `approv`
+#:            DID appear in the passages, in an unrelated sense, so the guard
+#:            stood down. Worse than the case it was built for: this one
+#:            attributes an invented regulatory claim to a named document.
+#:
+#: TOO STRONG - "Is the milk safe to drink after I deworm my goat?" was refused
+#:            with five passages retrieved, because they discuss withdrawal
+#:            periods without using the word "safe". That is the single question
+#:            type the safety layer exists to serve. "Can Newcastle disease be
+#:            cured once the birds are already sick?" was refused the same way,
+#:            when the correct answer - no cure, prevent by vaccination - was
+#:            sitting in the six passages it had.
+#:
+#: Presence of a word is not a position on a question, and absence of a word is
+#: not absence of an answer. So the test is no longer about words in passages.
+#:
+#: Regulatory status is different in kind. Section 1 states plainly that NAFDAC
+#: registration data is not openly published, so no retrieval result can make
+#: "is X registered in Nigeria" answerable. That is knowable in advance, which
+#: is what makes it a rule rather than a guess.
+#:
+#: WHAT THIS GIVES UP, STATED PLAINLY
+#: "Is there a cure for cassava mosaic disease?" -> "Yes" is no longer caught.
+#: It is a real defect: a virus is controlled, never cured. It is kept out
+#: because the only test that caught it also refused the two questions above,
+#: and denying a farmer "there is no cure, vaccinate instead" costs more than a
+#: wrong framing attached to correct control advice. Recorded in FINDINGS as
+#: open rather than fixed.
+REGULATORY_TERMS = (
+    r"\bregistered\b|\bregistration\b|\bapproved\b|\bapproval\b|"
+    r"\blicen[cs]ed\b|\bbanned\b|\bban\b|\billegal\b|\bpermitted\b"
+)
+
+#: ...asked ABOUT a jurisdiction. "Approved" alone is an ordinary word ("an
+#: approved practice"); it is "approved IN NIGERIA", "registered FOR USE", that
+#: asks for a regulatory fact. Requiring this keeps the rule off agronomy.
+_JURISDICTION = (
+    r"\bnigeria\w*\b|\bnafdac\b|\bgovernment\b|\bofficial\w*\b|"
+    r"\bfor use\b|\bby law\b|\blegal\w*\b|\bauthorit\w+\b"
+)
+
+_REGULATORY = re.compile(REGULATORY_TERMS, re.IGNORECASE)
+_JURISDICTION_RX = re.compile(_JURISDICTION, re.IGNORECASE)
+
+#: A question that opens with one of these demands a yes or a no.
+_CLOSED_OPENER = re.compile(
+    r"^\s*(?:is|are|does|do|did|can|could|will|would|has|have|had|should|was|were)\b",
+    re.IGNORECASE,
+)
+
+
+def sources_cannot_settle(question: str, source_texts: list[str]) -> str | None:
+    """Whether a closed question asks for a regulatory fact the corpus cannot hold.
+
+    Returns a short reason, or None when the question is open, is not about
+    regulatory status, or names no jurisdiction - in all three cases the model
+    has something to answer from and is left alone.
+
+    `source_texts` is no longer consulted and is kept in the signature
+    deliberately: the previous version's whole mistake was believing that what
+    the passages happen to contain could settle this, and a caller passing them
+    should see them ignored rather than quietly dropped.
+    """
+    if not _CLOSED_OPENER.match(question):
+        return None
+    if _REGULATORY.search(question) and _JURISDICTION_RX.search(question):
+        return "regulatory status"
+    return None
+
 class AdvisoryEngine:
     """Retrieval-grounded advisory with safety guards."""
 
@@ -382,6 +579,7 @@ class AdvisoryEngine:
         question: str,
         hits: list[SearchHit],
         texts: list[str],
+        no_guidance: str | None = None,
     ) -> Iterator[tuple[str, "GenerationStats | None"]]:
         """The one dosage-guarded generation loop. Every streaming consumer
         MUST go through here.
@@ -410,13 +608,42 @@ class AdvisoryEngine:
         carrying it was cut for length.
         """
         source_texts = [h.chunk.text for h in hits]
+
+        # A closed question the passages cannot settle is refused rather than
+        # answered. This sits in guarded_stream, not in stream(), because all
+        # three entry points - stream(), advise() and the web server's /ask -
+        # funnel through here, and this file has already been bitten once by a
+        # guard that lived on the tested path and not on the one a judge uses.
+        #
+        # The message is `no_guidance`, reused deliberately: "I do not have
+        # local guidance on that in my documents" is exactly true here, and it
+        # is already translated and speaker-reviewed. Inventing a second
+        # refusal string would mean shipping an unreviewed Pidgin sentence to
+        # say the same thing.
+        unsettled = sources_cannot_settle(question, source_texts)
+        if unsettled is not None:
+            yield no_guidance or NO_GUIDANCE_MESSAGE, None
+            return
+
         normalised_sources = _normalise_for_containment("\n".join(source_texts))
 
         buffer = ""
         guarding = False
         last_stats = None
 
-        for piece, stats in self.llm.stream(build_prompt(question, hits, texts)):
+        # PROMPT_ECHO_STOPS: the model can run past its answer and start
+        # reproducing the prompt scaffolding. Asked about rice leaf spot it
+        # emitted the source header, then the trailing citation, then the
+        # literal string "Farmer's question:" and carried on - it was
+        # continuing the document rather than answering it.
+        #
+        # These are the two strings build_prompt puts in the user turn, so
+        # seeing either in the OUTPUT means generation has left the answer.
+        # Cheaper and more reliable than post-hoc trimming: llama.cpp stops
+        # decoding rather than us deleting tokens already paid for.
+        for piece, stats in self.llm.stream(
+            build_prompt(question, hits, texts), stop=PROMPT_ECHO_STOPS
+        ):
             last_stats = stats
             if not guarding and any(ch.isdigit() for ch in piece):
                 guarding = True
@@ -466,7 +693,19 @@ class AdvisoryEngine:
         language = detect(question)
         messages = get_messages(language)
 
-        verdict = scope.check(question)
+        # Scope is checked against the NORMALISED question.
+        #
+        # Every policy rule in scope.py - dosage, live price, forecast, human
+        # medical - is written in English, and scope.check() was being handed
+        # the raw text. So the rules were written against a language they were
+        # never shown. Measured: "How much dem dey sell garri for market now?"
+        # passed scope.check() untouched and refused only because retrieval
+        # happened to find nothing above the floor; normalised first, the price
+        # rule fires correctly. Same for "Abeg how much dem dey sell maize now?".
+        #
+        # English passes through pidgin_for_retrieval byte-identically, so the
+        # English path - and every measurement taken on it - is unchanged.
+        verdict = scope.check(pidgin_for_retrieval(question))
         if not verdict.in_scope:
             return Advice(
                 question=question,
@@ -486,14 +725,40 @@ class AdvisoryEngine:
                 language=language,
             )
 
-        answer, stats = self.llm.complete(build_prompt(question, hits, texts))
+        # The SAME polarity guard the streaming path applies. It is repeated
+        # here rather than shared because advise() does not route through
+        # guarded_stream - it calls llm.complete directly - and that divergence
+        # is exactly how this file previously ended up with guards that held on
+        # the tested path and not on the one a farmer touches. Here the risk ran
+        # the other way: advise() is what the EVALUATION HARNESS calls, so a
+        # guard only in guarded_stream would never have been measured at all.
+        unsettled = sources_cannot_settle(question, [h.chunk.text for h in hits])
+        if unsettled is not None:
+            return Advice(
+                question=question,
+                answer=messages.no_guidance,
+                hits=hits,
+                refused=True,
+                language=language,
+            )
+
+        answer, stats = self.llm.complete(
+            build_prompt(question, hits, texts), stop=PROMPT_ECHO_STOPS
+        )
 
         # Retrieval already decided there is guidance; a disclaimer here
         # contradicts the sources shown beside it.
         answer, disclaimed = strip_false_disclaimer(answer)
+
+        # An instruction that is the farmer's own symptom handed back - "for
+        # cutworms, cut off seedlings at the base every night". See
+        # strip_symptom_echo for why overlap alone is not the test.
+        answer, echoes = strip_symptom_echo(answer, question)
+
         if stats:
             stats.fields.update(comp)
             stats.fields["false_disclaimer_stripped"] = disclaimed
+            stats.fields["symptom_echoes_removed"] = len(echoes)
 
         safety = check_answer(
             answer,
@@ -520,6 +785,8 @@ class AdvisoryEngine:
             return messages.dosage_refusal
         if verdict.reason == "human medical":
             return messages.human_medical
+        if verdict.reason.startswith("harmful request"):
+            return messages.harmful_request
         if verdict.reason.startswith("out-of-scope crop"):
             return messages.out_of_scope_crop
         return messages.no_guidance

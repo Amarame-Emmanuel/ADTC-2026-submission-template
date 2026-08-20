@@ -227,6 +227,11 @@ _SELF_ASSESSMENT = re.compile(
 _MIN_QUESTION_RUN = 3
 #: ...and the questions must be aimed at the reader, not at the topic.
 _MIN_SELF_ASSESSMENT = 2
+#: Above this many consecutive questions, no second-person evidence is
+#: required: an FAQ alternates question and answer, so a run this long is a
+#: questionnaire whoever it addresses. Five, not three, so the existing
+#: person test still governs the ambiguous middle.
+_LONG_QUESTION_RUN = 5
 
 
 def is_question_checklist(text: str) -> bool:
@@ -275,6 +280,24 @@ def is_question_checklist(text: str) -> bool:
         longest = max(longest, run)
     if longest < _MIN_QUESTION_RUN:
         return False
+
+    # A long enough run needs no second-person evidence.
+    #
+    # The second-person requirement below was written for a business-plan
+    # workbook ("Have you determined whether to price below the market?") and it
+    # made the whole rule inert for an EXAM. A yam-disease research guide ends
+    # with "Questionnaire 1 Where are yams cultivated? 2 What are the major
+    # cultivated yam species grown in West Africa? 3 What are climatic
+    # requirements..." - thirteen consecutive unanswered questions, not one of
+    # them addressed to the reader, `is_question_checklist` returning False, and
+    # the passage taking a retrieval slot from a farmer asking why their tubers
+    # were rotting.
+    #
+    # Person is a proxy for "put TO the reader"; the unbroken run is the direct
+    # evidence, because an FAQ alternates question and answer by definition.
+    # Above _LONG_QUESTION_RUN the proxy is not needed and only does harm.
+    if longest >= _LONG_QUESTION_RUN:
+        return True
 
     return len(_SELF_ASSESSMENT.findall(text)) >= _MIN_SELF_ASSESSMENT
 

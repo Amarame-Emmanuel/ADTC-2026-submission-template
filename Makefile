@@ -71,7 +71,8 @@ CONSTRAIN = --memory=$(MEM_LIMIT) --memory-swap=$(MEM_LIMIT) \
 MOUNTS = -v "$(CURDIR):/app"
 
 .PHONY: help build fetch-models convert-models fetch-corpus index run shell \
-        bench coverage answers test verify-no-torch submission verify-submission clean
+        bench coverage answers probe-coverage probe-answers test verify-no-torch \
+        submission verify-submission clean
 
 help:
 	@echo "Àgbẹ̀ - make targets"
@@ -249,6 +250,20 @@ coverage:
 # this runs when answers might have changed.
 answers:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.answers --save $(ARGS)
+
+# Adversarial probe set (bench/probe_questions.json). Disjoint from the
+# evaluation set the system was built against: every question targets either a
+# risk introduced by a recent fix or a known blind spot. Expected to score
+# WORSE than `make answers` - a high score here means the probes are too easy.
+#
+# Read whole, never split: the dev/test hash is over eval_questions.json ids.
+probe-coverage:
+	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.coverage \
+		--questions bench/probe_questions.json --split all $(ARGS)
+
+probe-answers:
+	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m bench.answers \
+		--questions bench/probe_questions.json --split all $(ARGS)
 
 test:
 	docker run --rm $(CONSTRAIN) $(MOUNTS) $(IMAGE) python -m pytest tests/ -v
