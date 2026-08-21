@@ -1327,3 +1327,97 @@ retry turns a stalled model into a hang, and an honest refusal beats a spinner.
 **Still open.** One in ten farmers asking about bloat gets no advice, and the
 cause of the empty generation is unknown - nothing in the question or the
 retrieved passages explains why the model sometimes emits an immediate stop.
+
+### F-35 · The price refusal ate half of market advisory
+**Severity: medium — FIXED.**
+
+Market is one of the four advisory areas this system declares. The price rule
+was widened until it refused questions that had been checked BY HAND as
+must-answer weeks earlier:
+
+    "How do I decide what price to ask for my maize?"  -> refused, "live price"
+    "Where can I get a better price for my cassava?"   -> refused, "live price"
+
+Neither asks for a figure. The first asks for a METHOD and the second for a
+CHANNEL, and both are answerable from extension material by a system that knows
+no prices at all.
+
+**Why nothing caught it.** `test_refusal_recall.py` guards the must-REFUSE side
+of price thoroughly. Nothing guarded the must-ANSWER side, so an over-reaching
+pattern passed every test in the project while quietly removing the useful half
+of a whole advisory area. A refusal rule needs both lists or it drifts in one
+direction only, and the direction it drifts is the one no test is watching.
+
+The two were caught by two DIFFERENT branches - "what price" and "price for" -
+so the fix keys on the OPENER ("how do I", "where can I", "why do", "what
+makes") rather than patching branches one at a time; a third phrasing would have
+been caught by a third branch.
+
+**Measured, twenty market questions at the rule layer: 18 answered, 2 refused,
+and the 2 are exactly the ones asking for a figure.** Judgement, timing,
+grading, channels, cooperatives and why prices move seasonally all answer.
+
+Also: "What are people paying nowadays?" WAS refused, but by the in-domain gate
+rather than the price rule - so the farmer got "no guidance in my documents"
+instead of the explanation that this system has no price data. Same outcome,
+worse message, and an attribution that would have broken the moment the question
+named a crop.
+
+### F-36 · Four copies of the currency list, and a leak under all of them
+**Severity: HIGH — FIXED. This is F-33 one level deeper.**
+
+Running the repaired market questions through the interface produced, in three
+of five runs:
+
+    "the local market price per kilogram is ZMK 8"
+    "which translates to approximately 8.00 US$ per kg"
+
+A Zambian figure, and a dollar figure, shown to a Nigerian farmer, on a question
+that had just been made answerable. Three separate defects were stacked here.
+
+**1. The code may follow the number.** Currency codes were matched only BEFORE
+the amount, so "KSh 100" was redacted and "100 KSh" was not. Only spelled-out
+names were handled in that order.
+
+**2. The list was out of date, and lists are plural.** There were FOUR currency
+lists - three in `safety.py` and a fourth in `advisor._MONEY_MARK` - and they
+had drifted exactly as four copies of a list do. All carried ZMW, the CURRENT
+Zambian code; the corpus was written when it was ZMK. **A currency list covering
+only currencies still in use will always lag a corpus of documents written in
+the past.** They are now one list.
+
+`8.00 US$` failed for a third reason: the trailing branch closed on `\b`, which
+never fires after "$" - a symbol followed by a space is two non-word characters
+with no boundary between them.
+
+**3. The token split, which no per-piece test can survive.** With the list
+fixed, `ZMK 8` STILL reached the farmer in two of three runs - while
+`find_money` run over the same finished answer found it. The guard was correct
+and the stream defeated it: the model emits "Z", "MK", " 8", so no single piece
+looks like money. The guard woke on the bare digit, by which time "ZMK" was
+already sent.
+
+F-33's fix - widen what STARTS buffering - cannot reach this. It works only when
+the trigger and the amount share a piece; here the trigger is in an earlier
+piece that is already gone.
+
+**The stream now holds 24 characters back** and folds that tail into the buffer
+when buffering starts, so the guard can look backwards across a split token.
+
+**Measured: 2 leaks in 12 interface runs before, 0 in 12 after.** The tail is
+covered by tests that stream one CHARACTER at a time - the worst case - and that
+assert the full text survives, because an answer silently missing its last few
+characters would be a worse defect than the leak and would show in no metric.
+
+**A near miss worth recording.** The first version of the widened pattern
+contained a doubled `|`, giving the alternation an empty branch:
+`find_money("250 kg per hectare")` returned twenty-odd empty matches, and
+redaction would have replaced every character boundary in every answer with the
+no-price notice. It raises nothing and passes any test that only checks amounts
+ARE caught. It is now asserted directly.
+
+**And the old bugs, twice more.** Patching `"_MONEY = re.compile("` matched
+inside `"_FOREIGN_MONEY = re.compile("` and corrupted the file - the substring
+defect of F-31, on this same name, for the second time. A `\b` written through
+a heredoc reached disk as a 0x08 backspace again; `tests/test_source_hygiene.py`
+caught it before it could compile into a pattern that matches nothing.

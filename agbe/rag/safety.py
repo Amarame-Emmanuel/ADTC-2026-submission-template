@@ -417,19 +417,75 @@ def find_foreign_money(text: str) -> list[str]:
 #: dollars, and claiming regional knowledge. The scope rules never saw it: they
 #: pattern-match short questions and this was a paragraph. An answer-side rule
 #: does not care how the question was phrased, which is the point.
+#: Every currency token this system may meet, symbol or code, in ONE place.
+#:
+#: This used to be three hand-maintained lists - symbols, codes before a
+#: number, names after one - and they drifted apart exactly as three copies of
+#: a list do. Codes were added to the leading list and not the trailing one, so
+#: "KSh 100" was caught and "100 KSh" was not.
+#:
+#: ZMK is the specific lesson. The list carried ZMW, the CURRENT Zambian code;
+#: the corpus was written when it was ZMK, so a real answer read "the local
+#: market price per kilogram is ZMK 8" and the guard did not know the word. A
+#: currency list covering only currencies still in use will always lag a corpus
+#: of documents written in the past.
+#: Symbols, with the country prefix writers put in front of them. "8.00 US$"
+#: defeated both old branches at once: the leading one needs digits AFTER the
+#: symbol, and the trailing one wanted the symbol immediately after the digits,
+#: with no room for the "US".
+CURRENCY_SYMBOL = r"(?:US|U\.S\.|AU|CA|NZ|HK|SG|NT)?[$£€₦]"
+
+#: Codes. Africa first, current AND the ones the documents still use.
+#:
+#: ZMK is the lesson. The list carried ZMW, the CURRENT Zambian code; the corpus
+#: was written when it was ZMK, so a real streamed answer read "the local market
+#: price per kilogram is ZMK 8" and no guard knew the word. A currency list
+#: covering only currencies still in use will always lag a corpus of documents
+#: written in the past.
+#:
+#: MUST be used inside \b...\b. "[KUT]?\.?Shs?" matches a bare "sh", which
+#: without boundaries fires inside "should", "sheep" and "harvesting".
+CURRENCY_CODE = (
+    r"(?:[KUT]?\.?Shs?"
+    r"|KES|KSH|TZS|UGX|ZMW|ZMK|MWK|RWF|ETB|BIF|SOS|SDG|SSP|CDF|AOA"
+    r"|GHS|GHC|XOF|XAF|GNF|GMD|LRD|SLL|SLE|CVE|STN|MZN|BWP|NAD|ZAR|LSL|SZL"
+    r"|EGP|MAD|DZD|TND|LYD|MUR|SCR|MGA|KMF|DJF|ERN|NGN"
+    r"|USD|EUR|GBP|CNY|JPY|INR|CHF|CAD|AUD)"
+)
+
+#: Spelled-out names, which only ever follow the number.
+CURRENCY_WORD = (
+    r"(?:naira|kobo|dollars?|cents?|pounds?|euros?|shillings?|kwacha|cedis?|"
+    r"rand|francs?|birr|dalasis?|leones?|kwanzas?|meticals?|pulas?|dirhams?)"
+)
+
+#: Everything that marks an amount. ONE list, because there were four - three
+#: in this file and a fourth in `advisor._MONEY_MARK` - and they drifted exactly
+#: as four copies of a list do. Codes were added to some and not others, so
+#: "KSh 100" was caught, "100 KSh" was not, and "ZMK 8" was caught by neither.
+_CURRENCY = CURRENCY_SYMBOL + r"|" + CURRENCY_CODE
+
+#: A name may carry a nationality adjective ("4,500 Kenyan shillings"); a code
+#: may not.
+_CURRENCY_NAME = (
+    r"(?:kenyan|ghanaian|nigerian|ugandan|tanzanian|zambian|malawian|rwandan|"
+    r"ethiopian|south african|american|us|west african|central african)?\s*"
+    + CURRENCY_WORD
+)
+#: A number preceded OR followed by a currency token.
+#:
+#: Bare "N" is accepted only BEFORE a number. After one it is nitrogen - "apply
+#: 60 N per hectare" is ordinary fertiliser advice, and redacting it would be
+#: the price rule eating agronomy.
 _MONEY = re.compile(
+    # `(?!\w)` rather than `\b` to close the token. A word boundary after a
+    # SYMBOL never fires - "8.00 US$ per kg" ends the match on "$", and "$"
+    # followed by a space is two non-word characters with no boundary between
+    # them - so that amount leaked while every code-ending one was caught.
     r"(?:"
-    # symbol or code, then a number:  $0.40   KSh 87   UGX 3000   N45,000
-    # Shilling codes vary by country and by writer: KSh, UShs, TShs, Ush.
-    # "UShs 426,377 per hectare" reached the interface because only UGX and
-    # KSh were listed.
-    r"(?:[$£€₦]|\bN|\b[KUT]?\.?Shs?|\bKES|\bTZS|\bUGX|\bZMW|\bMWK|"
-    r"\bGH\.?S|\bXOF|\bXAF|\bZAR|\bUSD|\bEUR|\bGBP|\bNGN)"
-    r"\s*\d[\d,.]*"
-    r"|"
-    # a number, then a currency name:  4,500 Kenyan shillings   1200 naira
-    r"\d[\d,.]*\s*(?:kenyan|ghanaian|nigerian|ugandan|tanzanian|zambian|malawian|south african|american|us|west african)?\s*(?:naira|kobo|dollars?|cents?|pounds?|euros?|"
-    r"shillings?|kwacha|cedis?|rand|francs?)"
+    r"(?:" + _CURRENCY + r"|\bN)\s*\d[\d,.]*|"
+    r"\d[\d,.]*\s*(?:" + _CURRENCY + r")(?!\w)|"
+    r"\d[\d,.]*\s*(?:" + _CURRENCY_NAME + r")\b"
     r")",
     re.IGNORECASE,
 )

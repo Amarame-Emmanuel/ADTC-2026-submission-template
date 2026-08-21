@@ -54,6 +54,9 @@ from agbe.rag.query import retrieval_query, with_diagnostic_intent
 from agbe.translate.pidgin_norm import for_retrieval as pidgin_for_retrieval
 from agbe.translate.farm_terms import for_retrieval as farm_terms_for_retrieval
 from agbe.rag.safety import (
+    CURRENCY_CODE,
+    CURRENCY_SYMBOL,
+    CURRENCY_WORD,
     SafetyVerdict,
     check_answer,
     find_dosages,
@@ -102,13 +105,40 @@ from agbe.rag.safety import (
 #: answering and started reproducing its own input - see guarded_stream.
 #: Anything that can begin a monetary amount. Used only to decide WHEN to
 #: start buffering; the redaction itself is in agbe/rag/safety.py.
+#: What makes the stream start BUFFERING, so the whole-answer money guard gets
+#: a chance to see an amount before it is sent.
+#:
+#: This was a fourth private copy of the currency list and it lagged the other
+#: three: it had ZMW and not ZMK, so "the local market price per kilogram is
+#: ZMK 8" streamed straight to the farmer. `find_money` run over the SAME
+#: finished answer found it - the guard was correct and the stream defeated it,
+#: because "ZMK" was flushed before the "8" that would have woken the guard
+#: arrived. It is now built from the one list in safety.py.
+#:
+#: This is the mark, not the matcher: it may over-buffer harmlessly, and
+#: `redact_money` decides what is actually an amount.
+#: How much already-generated text the stream holds back before emitting it.
+#:
+#: A currency token can be SPLIT across pieces. The model emitted "ZMK 8" as
+#: "Z", "MK", " 8" - so `_MONEY_MARK` never saw "ZMK" in any single piece, the
+#: guard woke on the digit alone, and the buffer held " 8." with the code
+#: already sent. No per-piece test can fix that; the code is simply gone by the
+#: time the number arrives.
+#:
+#: So the stream keeps a short tail unsent, and when buffering starts the tail
+#: goes into the buffer. The guard can then match backwards across the split.
+#: 24 characters covers the longest currency token and the words around it
+#: ("approximately 8.00 US$"); the farmer sees a lag of a few characters.
+_LOOKBEHIND = 24
+
+
 _MONEY_MARK = re.compile(
-    r"[$£€₦]"
+    CURRENCY_SYMBOL
     # A bare "N" must be followed by a figure. Without the lookahead it
     # matched "Nigeria" and "No rain", which buffered almost every answer.
-    r"|\bN(?=[\d,])"
-    r"|\b(?:USD|EUR|GBP|NGN|[KUT]?\.?Shs?|KES|TZS|UGX|ZMW|MWK|GHS|XOF|XAF|ZAR)\b"
-    r"|\b(?:naira|kobo|dollars?|cents?|shillings?|kwacha|cedis?|rand)\b",
+    + r"|\bN(?=[\d,])"
+    + r"|\b(?:" + CURRENCY_CODE + r")\b"
+    + r"|\b(?:" + CURRENCY_WORD + r")\b",
     re.IGNORECASE,
 )
 
@@ -691,6 +721,8 @@ class AdvisoryEngine:
 
         buffer = ""
         guarding = False
+        #: Emitted text held back so the guard can look behind a split token.
+        tail = ""
         last_stats = None
 
         # Hold back a leading run of bare citation markers. The model
@@ -728,7 +760,7 @@ class AdvisoryEngine:
         # failure into roughly 16%.
         for attempt in range(2):
             if attempt:
-                head, buffer, guarding = "", "", False
+                head, buffer, guarding, tail = "", "", False, ""
             for piece, stats in self.llm.stream(
                 build_prompt(question, hits, texts), stop=PROMPT_ECHO_STOPS
             ):
@@ -752,14 +784,22 @@ class AdvisoryEngine:
                 # "US$204 per hectare" and "KSh$81.21 per 50 kg bag" both reached
                 # the interface that way, while the unit tests passed because they
                 # call redact_money on a whole string.
+                # The tail is part of the test AND part of the buffer. Testing
+                # `piece` alone is what let "ZMK 8" through: the code and the
+                # digit arrived in different pieces, so neither piece looked
+                # like money on its own.
                 if not guarding and (
                     any(ch.isdigit() for ch in piece)
-                    or _MONEY_MARK.search(piece)
+                    or _MONEY_MARK.search(tail + piece)
                 ):
                     guarding = True
+                    buffer, tail = tail, ""
 
                 if not guarding:
-                    yield piece, stats
+                    tail += piece
+                    if len(tail) > _LOOKBEHIND:
+                        ready, tail = tail[:-_LOOKBEHIND], tail[-_LOOKBEHIND:]
+                        yield ready, stats
                     continue
 
                 buffer += piece
@@ -787,6 +827,12 @@ class AdvisoryEngine:
         if not head_done:
             yield no_guidance or NO_GUIDANCE_MESSAGE, last_stats
             return
+
+        # The held-back tail carries no digit - a digit would have started
+        # buffering - but it is released through the same guard rather than
+        # raw, so there is one exit from this loop and not two.
+        if tail:
+            yield self._release(tail, normalised_sources), last_stats
 
         if buffer:
             yield self._release(buffer, normalised_sources), last_stats

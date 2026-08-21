@@ -195,6 +195,25 @@ _SUBSTANCE = re.compile(
 # "should I sell now or store it" are judgement questions answerable from
 # extension material and must keep working; it is the price-seeking preposition
 # - selling FOR, sells AT - that marks the lookup.
+#: Asking HOW a price is decided, or WHERE to get a better one, is method and
+#: channel - not a figure.
+#:
+#: Both are the substance of market advisory and are answerable from extension
+#: material without knowing any price. Broadening the price rule to catch "what
+#: is a fair price" also caught "how do I DECIDE what price to ask" and "WHERE
+#: can I get a better price for my cassava", which are among the most useful
+#: questions this system takes.
+#:
+#: Keyed on the OPENER rather than by patching each price branch, because the
+#: two were caught by different branches ("what price" and "price for") and a
+#: third phrasing would have been caught by a third.
+_PRICE_METHOD = re.compile(
+    r"^\s*(?:how (?:do|can|should) i|where (?:can|do|should) i|"
+    r"why (?:do|does|are|is)|what makes|how are|how is)\b",
+    re.IGNORECASE,
+)
+
+
 _LIVE_PRICE = re.compile(
     r"\b(?:what(?:'s| is) the (?:current |today'?s? )?price|"
     r"how much (?:is|does|are|do)[^?]*(?:cost|sell|selling|go(?:ing)? for)|"
@@ -205,7 +224,12 @@ _LIVE_PRICE = re.compile(
     # Buyer side of the same lookup. "What do traders PAY FOR a bag of maize
     # these days?" returned Kenyan shilling figures to a Nigerian farmer.
     r"(?:pay|paying|paid|buying|bought|fetch(?:ing)?)[^?]{0,30}(?:bag|basket|tonne|kg|kilo|crate|tuber|bunch)|"
-    r"what (?:do|are)[^?]{0,40}(?:traders?|buyers?|market)[^?]{0,20}(?:pay|paying|offer)|"
+    r"what (?:do|are)[^?]{0,40}(?:traders?|buyers?|market|people|they)[^?]{0,20}(?:pay|paying|offer)|"
+    # "What are PEOPLE paying nowadays?" was refused, but by the in-domain
+    # gate - it names no farming word - so the farmer got the generic "no
+    # guidance in my documents" instead of the explanation that this system
+    # has no price data at all. Same outcome, worse message, and an
+    # attribution that would break the moment the question named a crop.
     # "Fetching" and "expect to get" are the same lookup again. The buyer-side
     # pattern above needs a container word (bag, basket); "what are cowpeas
     # fetching at Bodija market?" has none, and was answered.
@@ -937,7 +961,7 @@ def check(question: str, language: str = "en") -> ScopeVerdict:
     # Price is the narrower test - it needs a market or time marker - so it
     # goes first. `litre` was dropped from its per-unit branch in the same
     # change, or "how much X per litre" would misroute the other way.
-    if _LIVE_PRICE.search(question):
+    if _LIVE_PRICE.search(question) and not _PRICE_METHOD.match(question):
         return ScopeVerdict(False, "live price", LIVE_PRICE_MESSAGE)
 
     if _DOSAGE_QUESTION.search(question) and _SUBSTANCE.search(question):
