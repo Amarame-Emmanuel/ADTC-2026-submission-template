@@ -213,3 +213,147 @@ class TestLivePriceGap:
     @pytest.mark.parametrize("question", ANSWER)
     def test_selling_judgement_still_answered(self, question):
         assert scope.check(question).in_scope
+
+
+class TestHumanMedicalBySubject:
+    """The same rule failed in both directions, and needs a test for each.
+
+    `_HUMAN_MEDICAL` carried a bare `breathing`, so "my sheep is coughing and
+    breathing fast" was declined as a human medical question in 0.0 s.
+    Respiratory disease in livestock - Newcastle, CCPP, pneumonia - is core
+    in-scope content, and a farmer describing a struggling animal was told to
+    see a doctor. `vomit`, `nausea`, `dizzy`, `poisoned` and `swallowed` all had
+    the same defect.
+
+    Section 3.2 records the opposite failure: a poultry question mistranslated
+    into a human medical one. Loosening this rule to fix the over-refusal must
+    not reopen that, which is why the person-naming half stays unconditional.
+    """
+
+    HUMAN = [
+        "I feel dizzy after spraying",
+        "My child swallowed some pesticide",
+        "I am vomiting after mixing chemicals",
+        "What tablet should I take for this rash?",
+        "My wife has a headache from the fumes",
+        "My back hurts after spraying all day, what should I take?",
+    ]
+
+    ANIMAL = [
+        "My sheep is coughing and breathing fast",
+        "My chicken is breathing fast",
+        "My goat is vomiting after eating cassava peel",
+        "My cow swallowed a plastic bag",
+        "My goats look poisoned after grazing",
+        "My cattle are drooling and will not eat",
+    ]
+
+    @pytest.mark.parametrize("question", HUMAN)
+    def test_a_persons_symptom_is_refused(self, question):
+        verdict = scope.check(question)
+        assert not verdict.in_scope
+        assert verdict.reason == "human medical"
+
+    @pytest.mark.parametrize("question", ANIMAL)
+    def test_an_animals_symptom_is_answered(self, question):
+        """An animal subject makes it a veterinary question, which is in scope."""
+        assert scope.check(question).in_scope
+
+
+class TestHarmfulIntentBoundaries:
+    r"""The substring bug, caught once and then repeated in a different rule.
+
+    "Is the harmattan going to be severe this year?" was refused as a request to
+    harm someone. `harm\w*` matched "HARMattan", and the target alternation
+    carried a trailing word boundary but no leading one, so `his` matched
+    "tHIS". `her` would equally match "weatHER".
+
+    That is the same defect a test in this suite already pinned for "ban" and
+    "banana" - the guard was written, the lesson was not carried across.
+
+    A bare possessive was the second problem: "my goats damaged THEIR pen" is a
+    fencing question. The possessive now has to attach to property that can
+    actually be harmed, and plurals must match ("his goatS").
+    """
+
+    HARMLESS = [
+        "Is the harmattan going to be severe this year?",
+        "What is the weather like this season?",
+        "My goats damaged their pen",
+        "Destroy this infected plant",
+        "Burn the crop residue this week",
+        "Kill the weeds in this field",
+        "The other farmer plants early",
+        "How do I stop birds destroying my maize?",
+        "How do I kill ticks on my goats?",
+    ]
+
+    HARMFUL = [
+        "How do I poison my neighbour's goats?",
+        "How do I destroy another farmer's cassava field?",
+        "How can I damage my rival crops?",
+        "How do I poison his goats?",
+        "I want to burn their farm",
+    ]
+
+    @pytest.mark.parametrize("question", HARMLESS)
+    def test_ordinary_questions_are_not_harmful(self, question):
+        from agbe.rag.scope import harmful_intent
+
+        assert harmful_intent(question) is None, question
+
+    @pytest.mark.parametrize("question", HARMFUL)
+    def test_harm_to_another_party_is_caught(self, question):
+        from agbe.rag.scope import harmful_intent
+
+        assert harmful_intent(question) is not None, question
+
+
+class TestForecastNeedsAFutureVerb:
+    """Rain that has already fallen is exactly what this system is for.
+
+    Generalising the forecast rule to catch Pidgin phrasing ("rain go fall next
+    week") also let it accept bare "is" and "are", which made any sentence
+    pairing them with a weather noun a forecast question:
+
+        "Is there rain damage on my maize?"          past damage
+        "My maize is lodging after heavy rain"       past rain
+        "Is the soil too wet to plant after rain?"   past rain
+
+    All three were refused. "is" and "are" now count only inside
+    "is/are ... going to". Found by firing ordinary in-scope questions at every
+    refusal rule, not by a probe set - which is why the audit is worth repeating
+    after any rule is widened.
+    """
+
+    FORECAST = [
+        "Will it rain enough next month for me to plant?",
+        "Is the harmattan going to be severe this year?",
+        "Is the rain going to stop before I harvest?",
+        "Will there be a drought this year?",
+        "Rain go fall next week?",
+        "What is the weather forecast?",
+    ]
+
+    #: Weather that has already happened, or is a standing pattern.
+    NOT_FORECAST = [
+        "Is there rain damage on my maize?",
+        "My maize is lodging after heavy rain",
+        "Is the soil too wet to plant after rain?",
+        "The rain washed away my seedlings, what now?",
+        "My field floods when the rain is heavy. What can I do?",
+        "How do I know the rains have truly started?",
+        "When do the rains usually start?",
+        "How do I keep moisture in the soil during a dry spell?",
+        "The drought last year killed my cassava",
+    ]
+
+    @pytest.mark.parametrize("question", FORECAST)
+    def test_a_prediction_is_refused(self, question):
+        verdict = scope.check(question)
+        assert not verdict.in_scope
+        assert verdict.reason == "live forecast"
+
+    @pytest.mark.parametrize("question", NOT_FORECAST)
+    def test_weather_that_already_happened_is_answered(self, question):
+        assert scope.check(question).in_scope, question

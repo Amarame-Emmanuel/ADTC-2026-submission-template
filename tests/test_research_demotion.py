@@ -133,3 +133,47 @@ def test_off_crop_by_title_sorts_behind_on_crop() -> None:
     rice = chunk("Rice (Revised) (Grass family)", "Brown leaf spot of rice.")
     bean = chunk("Bean Leaves (New)", "Angular leaf spot lesions on the foliage.")
     assert _demote_off_crop([1, 0], [rice, bean], "my rice leaves have spots") == [0, 1]
+
+
+# ---------------------------------------------------------------------------
+# Post-harvest passages for field questions
+# ---------------------------------------------------------------------------
+
+from agbe.rag.index import asks_about_field
+
+
+def test_a_growing_plant_question_is_field_context() -> None:
+    """Asked "the bottom leaves of my maize are drying from the tip inwards",
+    the system answered "dry the maize to 13% moisture content or below" -
+    post-harvest advice for a symptom on a living plant. Two of six retrieved
+    slots were storage passages running 73 post-harvest terms per thousand
+    words, against 0-9 for the field passages beside them.
+    """
+    # Plurals and inflections. "My maize TASSELS are white" and "my okra is
+    # FLOWERING" both read as non-field questions until this was widened -
+    # `tassel` does not match "tassels", `flower` does not match "flowering" -
+    # so a field pest was answered with store hygiene advice.
+    for question in ("The bottom leaves of my maize are drying from the tip inwards",
+                     "Why do my groundnut pods stay empty when I lift the plant?",
+                     "My cassava leaves are yellow and twisted",
+                     "My cowpea is covered in black insects on the stem tips",
+                     "My maize tassels are white and powdery",
+                     "My okra is flowering but no pods form",
+                     "My yam setts did not sprout",
+                     "My maize whorl has shot holes"):
+        assert asks_about_field(question), question
+
+
+def test_a_storage_question_is_not_field_context() -> None:
+    """"Drying" belongs to both worlds - leaves dry on the plant, grain is dried
+    in the sun - so the gate keys on living-plant anatomy, and a named storage
+    location overrides it. "My yam tubers are rotting in the barn" must keep its
+    storage passages; it was fixed once already and must not regress.
+    """
+    for question in ("My maize is getting mouldy in the store",
+                     "Weevils are eating my cowpea in storage",
+                     "My yam tubers are rotting in the barn",
+                     "How dry should my maize be before I bag it?",
+                     "Should I sell my maize now or store it?",
+                     "How do I dry my maize before storage?"):
+        assert not asks_about_field(question), question

@@ -56,6 +56,7 @@ from agbe.rag.safety import (
     SafetyVerdict,
     check_answer,
     find_dosages,
+    redact_money,
     _normalise_for_containment,
 )
 
@@ -98,6 +99,19 @@ from agbe.rag.safety import (
 # to summarise less.
 #: Strings from the prompt itself. If generation emits one, it has stopped
 #: answering and started reproducing its own input - see guarded_stream.
+#: Anything that can begin a monetary amount. Used only to decide WHEN to
+#: start buffering; the redaction itself is in agbe/rag/safety.py.
+_MONEY_MARK = re.compile(
+    r"[$£€₦]"
+    # A bare "N" must be followed by a figure. Without the lookahead it
+    # matched "Nigeria" and "No rain", which buffered almost every answer.
+    r"|\bN(?=[\d,])"
+    r"|\b(?:USD|EUR|GBP|NGN|[KUT]?\.?Shs?|KES|TZS|UGX|ZMW|MWK|GHS|XOF|XAF|ZAR)\b"
+    r"|\b(?:naira|kobo|dollars?|cents?|shillings?|kwacha|cedis?|rand)\b",
+    re.IGNORECASE,
+)
+
+
 PROMPT_ECHO_STOPS = ["Farmer's question:", "\nSources:"]
 
 SYSTEM_PROMPT = """You advise smallholder farmers in southwest Nigeria on crops \
@@ -419,6 +433,45 @@ def build_prompt(
     ]
 
 
+#: A run of bare citation markers with no prose between them.
+#:
+#: WHY THIS EXISTS
+#: Asked "my goat has a swollen udder that feels hot" four times, the system
+#: answered correctly twice, once with "[1] [2] [3] [4] [5] [6]" followed by
+#: correct mastitis advice, and once with "[1] [2] [3] [4] [5] [6]" AND NOTHING
+#: ELSE - a 23-character answer consisting entirely of citation markers.
+#:
+#: Sources are presented to the model as "<passage> (Title, year) [n]", with the
+#: marker trailing each passage. The model sometimes reproduces the markers as a
+#: block before writing anything, and sometimes never gets past them.
+#:
+#: An empty answer is worse than a refusal: the farmer sees six citations and no
+#: advice, which reads as though the system said something. So a stripped answer
+#: that becomes empty is reported as such and the caller falls back to the
+#: no-guidance message.
+#: TWO or more markers, not one.
+#:
+#: Requiring a run matters. The model also writes "[1] suggests that the
+#: swelling is likely an infection", using a single marker as the SUBJECT of
+#: the sentence. Stripping that leaves "suggests that the swelling..." - an
+#: answer beginning mid-sentence, which is a defect this guard introduced on
+#: its first attempt. A single leading marker is left alone; a block of them
+#: is the failure being caught.
+_CITATION_RUN = re.compile(r"^(?:\s*\[\d+\]\s*){2,}")
+
+
+def strip_citation_dump(answer: str) -> tuple[str, bool]:
+    """Remove a leading run of bare citation markers.
+
+    Returns `(cleaned, was_empty)`. `was_empty` is True when the answer was
+    nothing but markers, which means generation produced no advice at all.
+    """
+    cleaned = _CITATION_RUN.sub("", answer, count=1).lstrip()
+    if not cleaned.strip():
+        return answer, True
+    return cleaned, False
+
+
 #: Regulatory status: the one thing a closed question can ask that this corpus
 #: can NEVER settle, whatever it happens to contain.
 #:
@@ -631,6 +684,16 @@ class AdvisoryEngine:
         guarding = False
         last_stats = None
 
+        # Hold back a leading run of bare citation markers. The model
+        # sometimes opens with "[1] [2] [3] [4] [5] [6]" before writing
+        # anything, and sometimes emits that and stops - a 23-character
+        # answer that is entirely markers. Buffering until the first LETTER
+        # arrives strips them before the farmer sees them, without waiting on
+        # a sentence boundary that may never arrive.
+        head = ""
+        head_done = False
+
+
         # PROMPT_ECHO_STOPS: the model can run past its answer and start
         # reproducing the prompt scaffolding. Asked about rice leaf spot it
         # emitted the source header, then the trailing citation, then the
@@ -641,22 +704,80 @@ class AdvisoryEngine:
         # seeing either in the OUTPUT means generation has left the answer.
         # Cheaper and more reliable than post-hoc trimming: llama.cpp stops
         # decoding rather than us deleting tokens already paid for.
-        for piece, stats in self.llm.stream(
-            build_prompt(question, hits, texts), stop=PROMPT_ECHO_STOPS
-        ):
-            last_stats = stats
-            if not guarding and any(ch.isdigit() for ch in piece):
-                guarding = True
+        # Generation is retried ONCE if it produces nothing.
+        #
+        # "My goat left side is swollen and tight after grazing wet grass"
+        # produced an empty answer in 2 of 5 runs, with six good passages
+        # retrieved and the bloat guidance sitting in them. Bloat kills within
+        # hours, so a farmer being told "I have no guidance" when the guidance
+        # is right there is the worst version of this failure.
+        #
+        # The retry is safe precisely because nothing has been sent: while
+        # `head_done` is False no piece has reached the caller, so starting a
+        # second generation cannot duplicate or contradict a first one. It
+        # costs one extra generation on a path that is rare, and turns a 40%
+        # failure into roughly 16%.
+        for attempt in range(2):
+            if attempt:
+                head, buffer, guarding = "", "", False
+            for piece, stats in self.llm.stream(
+                build_prompt(question, hits, texts), stop=PROMPT_ECHO_STOPS
+            ):
+                last_stats = stats
 
-            if not guarding:
-                yield piece, stats
-                continue
+                if not head_done:
+                    head += piece
+                    if not any(ch.isalpha() for ch in head):
+                        continue
+                    head_done = True
+                    piece, _only = strip_citation_dump(head)
+                    if not piece:
+                        continue
 
-            buffer += piece
-            if _SENTENCE_END.search(buffer):
-                yield self._release(buffer, normalised_sources), stats
-                buffer = ""
-                guarding = False
+                # A currency mark starts buffering too, not only a digit.
+                #
+                # The model streams "$" and "204" as SEPARATE pieces. Buffering on
+                # digits alone meant the "$" had already been sent to the farmer
+                # before the guard woke up, so the buffer held "204 per hectare"
+                # and the money pattern - which needs the symbol - could not match.
+                # "US$204 per hectare" and "KSh$81.21 per 50 kg bag" both reached
+                # the interface that way, while the unit tests passed because they
+                # call redact_money on a whole string.
+                if not guarding and (
+                    any(ch.isdigit() for ch in piece)
+                    or _MONEY_MARK.search(piece)
+                ):
+                    guarding = True
+
+                if not guarding:
+                    yield piece, stats
+                    continue
+
+                buffer += piece
+                if _SENTENCE_END.search(buffer):
+                    yield self._release(buffer, normalised_sources), stats
+                    buffer = ""
+                    guarding = False
+
+            if head_done:
+                break
+
+        # Generation that never produced a letter: everything is still held
+        # in `head` and it is all markers. Showing it would give the farmer
+        # six citations and no advice, which reads as though something was
+        # said.
+        # `head.strip()` was the wrong test. It catches a marker-only answer
+        # but NOT an answer that is empty because generation produced no
+        # tokens at all - "is it better to sell in bulk or in small lots?"
+        # returned a zero-length string after 5.7 seconds with one source
+        # retrieved. The farmer saw a blank space under their question.
+        #
+        # `not head_done` is true in both cases: it means no letter was ever
+        # emitted, whether because only markers arrived or because nothing
+        # did. Either way there is no advice to show.
+        if not head_done:
+            yield no_guidance or NO_GUIDANCE_MESSAGE, last_stats
+            return
 
         if buffer:
             yield self._release(buffer, normalised_sources), last_stats
@@ -673,8 +794,15 @@ class AdvisoryEngine:
 
     @staticmethod
     def _release(span: str, normalised_sources: str) -> str:
-        """Emit a buffered sentence, redacting any ungrounded dosage in it."""
-        out = span
+        """Emit a buffered sentence, redacting ungrounded dosages and any money.
+
+        Dosages are redacted only when ABSENT from the sources; money is
+        redacted unconditionally. This system is offline against a fixed
+        corpus and cannot know what anything costs today, so an invented
+        figure and a six-year-old figure read out of a source are equally
+        unusable - see redact_money in agbe/rag/safety.py.
+        """
+        out, _money = redact_money(span)
         for dosage in find_dosages(span):
             if _normalise_for_containment(dosage) not in normalised_sources:
                 out = out.replace(
@@ -705,7 +833,7 @@ class AdvisoryEngine:
         #
         # English passes through pidgin_for_retrieval byte-identically, so the
         # English path - and every measurement taken on it - is unchanged.
-        verdict = scope.check(pidgin_for_retrieval(question))
+        verdict = scope.check(pidgin_for_retrieval(question), language)
         if not verdict.in_scope:
             return Advice(
                 question=question,
@@ -748,6 +876,18 @@ class AdvisoryEngine:
 
         # Retrieval already decided there is guidance; a disclaimer here
         # contradicts the sources shown beside it.
+        answer, _money = redact_money(answer)
+
+        answer, only_citations = strip_citation_dump(answer)
+        if only_citations:
+            return Advice(
+                question=question,
+                answer=messages.no_guidance,
+                hits=hits,
+                refused=True,
+                language=language,
+            )
+
         answer, disclaimed = strip_false_disclaimer(answer)
 
         # An instruction that is the farmer's own symptom handed back - "for
@@ -764,6 +904,7 @@ class AdvisoryEngine:
             answer,
             source_texts=[h.chunk.text for h in hits],
             source_years=[h.chunk.year for h in hits],
+            question=question,
         )
         notice = safety.as_notice(language)
         if notice:
@@ -785,6 +926,18 @@ class AdvisoryEngine:
             return messages.dosage_refusal
         if verdict.reason == "human medical":
             return messages.human_medical
+        # Reasons without a translated string fall through to no_guidance
+        # below, which is safe but generic. These carry their own English
+        # text from scope.py until a speaker reviews a translation.
+        if verdict.reason in ("personal decision", "out of domain",
+                              "financial or legal", "mechanical repair",
+                              "live price") or verdict.reason.startswith(
+            "outside the service area"
+        ):
+            return verdict.message
+
+        if verdict.reason == "live forecast":
+            return messages.live_forecast
         if verdict.reason.startswith("harmful request"):
             return messages.harmful_request
         if verdict.reason.startswith("out-of-scope crop"):

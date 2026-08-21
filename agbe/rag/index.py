@@ -224,6 +224,114 @@ _RESEARCH_REGISTER = re.compile(
 )
 
 
+#: Post-harvest vocabulary: storage, drying, bagging, transport, processing.
+_POSTHARVEST_TERMS = re.compile(
+    r"\b(?:storage|storing|stored|store|stores|drying|dried|dry(?:ing)? floor|"
+    r"moisture content|bagging|bagged|warehouse|shelf ?life|threshing|"
+    r"winnow\w*|silo|crib|post-?harvest|packaging|hermetic|tarpaulin)\b",
+    re.IGNORECASE,
+)
+
+#: A question about a plant that is still growing names its ANATOMY.
+#: A question about a plant that is still growing names its ANATOMY.
+#:
+#: Every term carries an optional plural, and inflections are matched with
+#: `\w*` where the word has them. Without that, "my maize TASSELS are white"
+#: and "my okra is FLOWERING" both read as non-field questions - `tassel` does
+#: not match "tassels", and `flower` does not match "flowering" - so the
+#: post-harvest demotion stepped aside and a field pest was answered with store
+#: hygiene advice. That is the third time a missing plural has broken a rule in
+#: this codebase; `tests/test_guard_boundaries.py` exists because of the first.
+_FIELD_CONTEXT = re.compile(
+    r"\b(?:leaf|leaves|vine|stem|flower\w*|seedling|plant\w*|field|"
+    r"shoot|root|panicle|tassel|cob|branch|foliage|grow\w*|germinat\w*|"
+    r"pod|tuber|sett|sucker|node|tip|whorl|silk|husk|crown|runner|"
+    r"canopy|stand|nursery|transplant\w*|till\w*|head)s?\b",
+    re.IGNORECASE,
+)
+
+#: ...unless it also names where the harvest is being kept, in which case it is
+#: a storage question however much plant vocabulary it carries.
+_STORE_CONTEXT = re.compile(
+    r"\b(?:store|stored|storing|storage|barn|crib|warehouse|silo|bag|bags|"
+    r"sack|sacks|after harvest|post-?harvest|market|selling|sell|transport|"
+    r"shelf)\b",
+    re.IGNORECASE,
+)
+
+#: Post-harvest terms per thousand words, above which a passage is treated as
+#: written about the store rather than the field. Calibrated on the two
+#: measured failures: their post-harvest passages ran 42-73 per thousand, while
+#: the field passages in the same result sets scored 0-9.
+_POSTHARVEST_DENSITY = 25.0
+#: ...and an absolute floor, so a short passage with one stray "store" is safe.
+_POSTHARVEST_MIN_TERMS = 3
+
+
+def asks_about_field(query_text: str) -> bool:
+    """Whether a question is about a growing plant rather than a stored crop."""
+    return bool(
+        _FIELD_CONTEXT.search(query_text) and not _STORE_CONTEXT.search(query_text)
+    )
+
+
+def _is_postharvest(chunk: Chunk) -> bool:
+    body = f"{chunk.title} {chunk.text}"
+    n = len(_POSTHARVEST_TERMS.findall(body))
+    if n < _POSTHARVEST_MIN_TERMS:
+        return False
+    words = max(1, len(body.split()))
+    return (1000.0 * n / words) >= _POSTHARVEST_DENSITY
+
+
+def _demote_postharvest(
+    fused: list[int], chunks: list[Chunk], query_text: str
+) -> list[int]:
+    """Move storage and drying passages behind field passages, for field questions.
+
+    WHY THIS EXISTS
+    Asked "the bottom leaves of my maize are drying from the tip inwards", the
+    system answered "dry the maize to 13% moisture content or below to minimise
+    insect and fungal growth" - post-harvest advice for a symptom on a living
+    plant. Asked "why do my groundnut pods stay empty when I lift the plant?" it
+    answered "because the pods contain water... dry the pods well after lifting".
+    Neither farmer has harvested anything.
+
+    Measured on those two questions: two of six and three of six retrieved slots
+    were post-harvest passages, running 42-73 post-harvest terms per thousand
+    words against 0-9 for the field passages in the same result set. The corpus
+    is rich in storage and processing material and it shares vocabulary with
+    field questions - pods, cobs, drying, leaves - so it competes on the terms
+    that matter and wins slots it should not.
+
+    This is the same failure the A-K review recorded twice ("my maize cobs have
+    only a few grains" and "why are my cowpea pods empty" both answered with
+    storage advice), which makes four independent instances across three
+    question sets.
+
+    WHY IT KEYS ON THE QUESTION'S ANATOMY, NOT ITS VERBS
+    "Drying" appears in both worlds - leaves dry on the plant, grain is dried in
+    the sun - so a verb test would classify the maize question as post-harvest
+    and do nothing. What separates them is that a field question names a part of
+    a LIVING plant. A question that also names where a harvest is kept - barn,
+    store, bag, market - is a storage question whatever else it says, and is
+    left alone: "my yam tubers are rotting in the barn" must keep its storage
+    passages.
+
+    Demotion, not exclusion, as everywhere else in this module: if there are not
+    enough field passages to fill top_k these still appear.
+    """
+    if not asks_about_field(query_text):
+        return fused
+
+    field: list[int] = []
+    postharvest: list[int] = []
+    for idx in fused:
+        target = postharvest if _is_postharvest(chunks[idx]) else field
+        target.append(idx)
+    return field + postharvest
+
+
 def _demote_research_protocol(fused: list[int], chunks: list[Chunk]) -> list[int]:
     """Move researcher-facing passages to the back of the queue.
 
@@ -399,6 +507,11 @@ class VectorIndex:
         # crop partition and before top_k is taken, so it changes which
         # candidates are considered rather than reordering the chosen six.
         fused = _demote_research_protocol(fused, self.chunks)
+
+        # Storage and drying passages go behind field passages when the
+        # question is about a growing plant. See _demote_postharvest for the
+        # four measured instances of a field symptom answered from the store.
+        fused = _demote_postharvest(fused, self.chunks, query_text)
 
         # Passages the lexical ranker put at the very top are exempt from the
         # dense floor.

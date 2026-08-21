@@ -236,6 +236,13 @@ class TestForeignCurrency:
         "average of UGX 3000 per sack",
         "about 120 000 TZS for the season",
         "roughly 25 Ghanaian cedis",
+        # Symbols, not only codes. A long framed question about selling maize
+        # produced "the market price for maize in your region is around $0.40
+        # per kilogram" - fabricated, in dollars, and USD was in the list while
+        # the bare symbol was not.
+        "the market price is around $0.40 per kilogram",
+        "about £12 a bag",
+        "roughly €3 per kilo",
     ]
 
     NOT_FOREIGN = [
@@ -247,6 +254,9 @@ class TestForeignCurrency:
         "Apply 250 kg per hectare",
         # A currency name with no figure beside it is prose.
         "Kenyan shilling notes were redesigned",
+        # Naira is the local currency and must never be flagged, in either form.
+        "₦45,000 per bag at the farm gate",
+        "Sell at N45,000 per bag in Ibadan",
     ]
 
     @pytest.mark.parametrize("answer", FOREIGN)

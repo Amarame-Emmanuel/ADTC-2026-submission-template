@@ -47,6 +47,72 @@ _STRONG = {"dey", "wey", "sabi", "abeg", "una", "dem", "comot", "wetin",
 _WEAK = {"na", "don", "no", "go", "make", "fit", "well well", "now now",
          "plenty", "small small"}
 
+#: Markers that essentially never occur in English, in any spelling.
+#:
+#: WHY THIS SET WAS SPLIT OUT
+#: Sixteen Pidgin questions were put through the interface and only six were
+#: detected as Pidgin. The ten misses shared one shape - ONE strong marker and
+#: ONE weak one - which the thresholds below require two weak markers to accept:
+#:
+#:     "Abeg how I go take stop weevil for my maize?"   abeg + go
+#:     "My chicken no dey lay egg again"                dey  + no
+#:     "Wetin make my groundnut leaf get black spot?"   wetin + make
+#:
+#: That is the ordinary shape of a Pidgin sentence, not an edge case. A miss
+#: costs twice: retrieval never sees the normalised text, and the farmer gets
+#: English refusal messages.
+#:
+#: The fix is not simply a lower threshold. "dem", "dis", "dat" and "di" are
+#: one keystroke from "them", "this", "that" and "the", so a single one of them
+#: must not be enough. These, by contrast, have no English neighbour - one is
+#: decisive on its own.
+_UNAMBIGUOUS = {
+    "dey", "wetin", "abeg", "wey", "sabi", "una", "comot", "waka",
+    "oga", "biko", "naim", "pikin", "pickin", "yansh", "wan", "sef",
+    "abi", "shebi", "kpatakpata",
+}
+
+#: Multi-word constructions that are unambiguously Pidgin.
+#:
+#: Seventeen of forty Pidgin questions were still detected as English after the
+#: single-word markers were widened. The misses were not random - they share a
+#: small set of grammatical constructions that carry no unambiguous marker WORD:
+#:
+#:     "My maize leaf get long grey mark FOR AM"     for + am
+#:     "My cassava DON GET white thing"              don + verb
+#:     "My yam sett NO GREE sprout"                  no gree
+#:     "How I GO TAKE dry my maize?"                 go take
+#:     "Which time better MAKE I plant yam?"         make I
+#:
+#: Each is a phrase, so none could ever be caught by a word-set intersection.
+#: They are listed here rather than added to _UNAMBIGUOUS because a phrase is
+#: safer than its parts: "for" and "am" and "get" are all ordinary English, and
+#: only their combination is decisive.
+#: Matched with WORD BOUNDARIES, not substring containment. "e be" is a
+#: substring of "th-E BE-st", so a plain `in` test called "what is the best way
+#: to store yam?" Pidgin. That is the third time this exact bug has appeared in
+#: this codebase - `ban` in `banana`, `his` in `this`, and now this - so the
+#: phrases are compiled rather than listed as bare strings.
+_UNAMBIGUOUS_PHRASES = (
+    "no gree", "go take", "make i", "for am", "for di", "for dem",
+    "don get", "don begin", "don dey", "don start", "don come",
+    "dey go", "dey come", "no be", "e be", "e dey", "e don",
+    "wetin be", "how i go", "which one better", "make e",
+)
+
+_PHRASE_RX = tuple(
+    re.compile(r"\b" + re.escape(p) + r"\b", re.IGNORECASE)
+    for p in _UNAMBIGUOUS_PHRASES
+)
+
+#: Multi-word markers, matched against the TEXT rather than the word set.
+#:
+#: "well well", "now now" and "small small" sat in _WEAK where they could never
+#: fire: matching is a set intersection over single words, so no phrase in that
+#: set had ever matched anything. Dead entries that looked functional.
+_WEAK_PHRASES = ("well well", "now now", "small small", "quick quick",
+                 "sharp sharp", "una own")
+
 _WORD = re.compile(r"[a-z]+")
 
 #: Strong markers needed on their own, or strong+weak in combination. Two
@@ -95,6 +161,54 @@ _YORUBA_WORDS = {"bawo", "jowo", "gbogbo", "sugbon", "nitori", "agbado",
 _IGBO_WORDS = {"kedu", "gini", "anyi", "nke", "ihe", "ndi", "unu", "maka",
                "banyere", "akwukwo", "ewu", "oka"}
 
+#: Hausa, the third major Nigerian language.
+#:
+#: WHY HAUSA AND NOT TWI OR FRENCH
+#: Two things separate it. It is NIGERIAN, so it does not collide with the
+#: service-area rule that declines Ghanaian and Senegalese questions - Kano and
+#: Kaduna are already on the "here" list. And `test_advisor.py` has tested
+#: `get("hau")` falling back to English since before this was added, so the
+#: fallback path was written with Hausa in mind.
+#:
+#: This adds DETECTION only, which is exactly the status Yoruba and Igbo have.
+#: A detected language with no validated message set falls back to English
+#: strings, so nothing a farmer sees is machine-translated. What changes is that
+#: the English-only in-domain gate now steps aside for Hausa, as it does for the
+#: other two, instead of refusing "Akuyata ba ta cin abinci" as out of domain.
+#:
+#: THE HOOKED LETTERS ARE DECISIVE
+#: b-hook, d-hook, k-hook and the apostrophe-y are Hausa orthography and occur
+#: in no European language, no English text, and neither Yoruba nor Igbo. One is
+#: enough, on the same reasoning as s-underdot for Yoruba.
+_HAUSA_CHARS = ("ɓ", "ɗ", "ƙ", "ƴ")   # b, d, k with hook; y with hook
+
+#: ...but Hausa is very often typed without them, plain b/d/k, exactly as Yoruba
+#: is typed without its underdots. These are the fallback: common words that are
+#: not English, not Pidgin, and not Yoruba or Igbo. Farm vocabulary is included
+#: because that is what this system will actually receive.
+#:
+#: Deliberately excluded: "da", "na", "ba", "ya" - all real Hausa particles, all
+#: two letters, and all far too collidable to carry evidence.
+#: Hausa words with no English, Pidgin, Yoruba or Igbo neighbour. ONE is
+#: enough, on the same reasoning as the Pidgin _UNAMBIGUOUS set: requiring two
+#: made "Akuya ta ba ta cin abinci" (my goat is not eating) and "Rogo na ya yi
+#: rawaya" (my cassava is yellowing) fall through to English, and those are
+#: exactly the sentences this system exists to answer.
+_HAUSA_UNAMBIGUOUS = {
+    "akuya", "awaki", "shanu", "kaza", "kaji", "kiwo",
+    "masara", "rogo", "dawa", "gero", "gona", "noma", "girbi",
+    "abinci", "rawaya", "taki", "yaya", "sannu", "saboda", "domin",
+}
+
+#: Weaker: real Hausa, but short or collidable enough to need support.
+_HAUSA_WORDS = {
+    "ina", "yaya", "kuma", "sannu", "yanzu", "kada", "domin", "saboda",
+    "gona", "noma", "shuka", "girbi",          # farm, farming, plant, harvest
+    "masara", "rogo", "dawa", "gero",          # maize, cassava, sorghum, millet
+    "shanu", "akuya", "awaki", "kaza", "kaji",  # cattle, goat(s), hen, chickens
+    "ruwa", "kasa", "iri", "taki",             # water, soil, seed, fertiliser
+}
+
 #: Distinct script characters required before script evidence decides.
 _MIN_SCRIPT_CHARS = 2
 #: Unambiguous words required when diacritics are absent.
@@ -122,14 +236,40 @@ def detect(text: str) -> str:
 
     low = unicodedata.normalize("NFC", text).lower()
 
+    if _hits(low, _HAUSA_CHARS):
+        return "hau"
+
     yor = _hits(low, _YORUBA_CHARS)
     ibo = _hits(low, _IGBO_CHARS)
     shared = _hits(low, _SHARED_CHARS)
+
+    # ONE unambiguous letter is enough.
+    #
+    # `_MIN_SCRIPT_CHARS` of 2 was written for accents, which French and
+    # Portuguese also carry. But s-underdot and u/i-underdot are not accents -
+    # they are distinct letters that appear in no European language and in no
+    # English text. Requiring two of them made "Se mo le gbin agbado bayii?"
+    # (with s-underdot) fall through to English, and the in-domain gate then
+    # refused it.
+    if yor and not ibo:
+        return "yor"
+    if ibo and not yor:
+        return "ibo"
+
     if yor + ibo + shared >= _MIN_SCRIPT_CHARS:
         if yor > ibo:
             return "yor"
         if ibo > yor:
             return "ibo"
+        # Only shared vowels, or a dead tie. The language cannot be named, but
+        # the text is demonstrably NOT English - e-underdot and o-underdot do
+        # not occur in it. Saying "en" here sent the question to an
+        # English-only in-domain gate that refused it, so the shared vowels are
+        # reported as Yoruba: both fall back to English messages anyway, and
+        # the only thing that changes is that the gate steps aside.
+        if shared >= _MIN_SCRIPT_CHARS:
+            return "yor"
+
         # Only shared vowels, or a dead tie: not enough to name the language;
         # let word evidence below decide.
 
@@ -139,7 +279,14 @@ def detect(text: str) -> str:
 
     unique = set(words)
     strong = len(unique & _STRONG)
-    weak = len(unique & _WEAK)
+    weak = len(unique & _WEAK) + sum(p in low for p in _WEAK_PHRASES)
+
+    # One unambiguous marker settles it. See _UNAMBIGUOUS for why these are
+    # separated from the markers that are a keystroke from an English word.
+    if unique & _UNAMBIGUOUS:
+        return "pcm"
+    if any(rx.search(low) for rx in _PHRASE_RX):
+        return "pcm"
 
     if strong >= _MIN_STRONG:
         return "pcm"
@@ -150,6 +297,10 @@ def detect(text: str) -> str:
         return "yor"
     if len(unique & _IGBO_WORDS) >= _MIN_LANG_WORDS:
         return "ibo"
+    if unique & _HAUSA_UNAMBIGUOUS:
+        return "hau"
+    if len(unique & _HAUSA_WORDS) >= _MIN_LANG_WORDS:
+        return "hau"
 
     return "en"
 

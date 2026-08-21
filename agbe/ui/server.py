@@ -127,7 +127,7 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
         #
         # English passes through pidgin_for_retrieval byte-identically, so the
         # English path - and every measurement taken on it - is unchanged.
-        verdict = scope.check(pidgin_for_retrieval(question.text))
+        verdict = scope.check(pidgin_for_retrieval(question.text), language)
         if not verdict.in_scope:
             yield sse("refused", {
                 "message": engine._scope_message(verdict, messages),
@@ -215,6 +215,7 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
             "".join(answer_parts),
             source_texts=[h.chunk.text for h in hits],
             source_years=[h.chunk.year for h in hits],
+            question=question.text,
         )
         notice = verdict.as_notice(language)
         if notice:

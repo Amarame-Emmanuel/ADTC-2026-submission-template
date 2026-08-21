@@ -63,6 +63,8 @@ class MessageSet:
     withdrawal_period: str
     human_medical: str
     out_of_scope_crop: str
+    live_forecast: str
+
 
     #: Deliberately carries an English default rather than appearing in every
     #: MessageSet. Every other string here was reviewed by a Nigerian Pidgin
@@ -117,6 +119,13 @@ MESSAGES: dict[str, MessageSet] = {
             "yam, tomato, rice, cowpea, groundnut, pepper and okra, and about "
             "livestock. Please ask your extension officer."
         ),
+        live_forecast=(
+            "I cannot tell you what the weather will do - I have no forecast, "
+            "only farming guides. I can help you decide when the rains have "
+            "truly established, what to do if a dry spell comes, and how to "
+            "prepare a field that floods. For a forecast, listen to the radio "
+            "or check with your extension officer."
+        ),
     ),
     # Reviewed and approved by a Nigerian Pidgin speaker, 2026-08-07.
     "pcm": MessageSet(
@@ -159,6 +168,12 @@ MESSAGES: dict[str, MessageSet] = {
             "I no sabi about dat crop. Di book wey I get na about cassava, corn, "
             "yam, tomato, rice, beans, groundnut, pepper and okra, and about animal. "
             "Abeg ask your extension officer."
+        ),
+        # Provided by a Nigerian Pidgin speaker, 2026-08-20, and used verbatim.
+        live_forecast=(
+            "Omo, I not fit tell you anything on this one o. I no get any "
+            "forecast. You fit listen for your radio or go ask your extension "
+            "officer sha"
         ),
     ),
 }

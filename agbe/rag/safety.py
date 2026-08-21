@@ -172,6 +172,46 @@ VETERINARY_TREATMENT = re.compile(
     re.IGNORECASE,
 )
 
+#: A question ASKING about withdrawal, whatever the answer turns out to say.
+#:
+#: WHY THE ANSWER-SIDE TRIGGER IS NOT ENOUGH
+#: VETERINARY_TREATMENT keys on drug names in the ANSWER, which works when the
+#: model names a drug. It missed the two most dangerous cases in a probe run,
+#: because both answers avoided naming one:
+#:
+#:   "After treating my goat, when can I sell the milk?"
+#:   -> "wait until it has produced milk... around 8-14 weeks after conception"
+#:      Lactation onset, not drug withdrawal. A farmer following that sells
+#:      contaminated milk.
+#:
+#:   "How long before I can eat a treated chicken?"
+#:   -> "The CDC recommends waiting at least 24 hours after treatment"
+#:      Fabricated, with an invented authority. Real withdrawal periods are
+#:      drug-specific and run to days or weeks.
+#:
+#: Neither answer contained a drug name, so neither carried the warning. But the
+#: QUESTION is unmistakable, and it is precisely the question where a wrong
+#: answer causes harm to someone who never saw it - whoever drinks the milk.
+#:
+#: So the warning also fires on the question. The system cannot know which drug
+#: was used and therefore cannot know the period; "ask a veterinary officer" is
+#: not a hedge here, it is the only correct answer.
+WITHDRAWAL_QUESTION = re.compile(
+    r"\b(?:"
+    r"(?:when|how long|how soon)[^?]{0,60}"
+    r"(?:sell|drink|eat|consume|slaughter|market)[^?]{0,30}"
+    r"(?:milk|meat|egg|bird|chicken|goat|cow|animal)|"
+    r"(?:milk|meat|eggs?)[^?]{0,40}(?:after|following)[^?]{0,30}"
+    r"(?:treat\w*|inject\w*|dos\w*|medicine|drug)|"
+    r"(?:can|should|may) (?:i|we)[^?]{0,20}"
+    r"(?:drink|eat|consume|sell)[^?]{0,30}(?:milk|meat|eggs?)|"
+    r"(?:safe|alright|ok)[^?]{0,30}(?:to )?(?:drink|eat|consume|sell)"
+    r"[^?]{0,30}(?:milk|meat|egg)|"
+    r"(?:treated|medicated)[^?]{0,20}(?:animal|goat|cow|chicken|bird|milk|meat)"
+    r")\b",
+    re.IGNORECASE,
+)
+
 WITHDRAWAL_MENTIONED = re.compile(
     r"\b(?:withdrawal period|withdrawal time|withholding period|"
     r"do not (?:drink|consume|sell) (?:the )?milk|"
@@ -203,6 +243,7 @@ class SafetyVerdict:
     stale_chemical_sources: list[str] = field(default_factory=list)
     restricted_veterinary: list[str] = field(default_factory=list)
     missing_withdrawal_warning: bool = False
+    advises_container_reuse: bool = False
     foreign_currency: list[str] = field(default_factory=list)
 
     def as_notice(self, language: str = "en") -> str:
@@ -251,6 +292,8 @@ class SafetyVerdict:
                 + "). They are not Nigerian prices and should not be used to "
                 + "decide what to sell for. Ask at your local market."
             )
+        if self.advises_container_reuse:
+            lines.append(CONTAINER_REUSE_WARNING)
         if self.missing_withdrawal_warning:
             lines.append(msg.withdrawal_period)
         return "\n\n".join(lines)
@@ -321,7 +364,17 @@ def is_source_stale(year: str, now: int | None = None) -> bool:
 #: reads as though it said something. The farmer is told whose money it is.
 _FOREIGN_MONEY = re.compile(
     r"(?<![A-Za-z])("
-    r"K\.?Sh|KES|TZS|UGX|ZMW|MWK|GH\.?S|XOF|XAF|ZAR|USD|"
+    # Currency SYMBOLS, not only codes. A long framed question about whether
+    # to sell maize now produced "the market price for maize in your region is
+    # around $0.40 per kilogram" - a fabricated price, in US dollars, claiming
+    # regional knowledge. `USD` was in the list; the bare `$` was not, so
+    # nothing fired. The naira symbol and "N45,000" are deliberately absent.
+    r"[$£€](?=\s*\d)|"
+    # Shilling codes vary by country and by writer: KSh, UShs, TShs, Ush, Tsh.
+    # "UShs 426,377 per hectare" reached the interface because only UGX and
+    # KSh were listed. The optional leading letter and plural cover the set.
+    r"[KUT]?\.?Sh(?:s|illing)?\.?(?=\s*\d)|"
+    r"KES|TZS|UGX|ZMW|MWK|GH\.?S|XOF|XAF|ZAR|USD|"
     r"(?:kenyan|tanzanian|ugandan|zambian|malawian|ghanaian|south african)\s+"
     r"(?:shillings?|kwacha|cedis?|rand)|"
     r"shillings?|kwacha|cedis?"
@@ -346,9 +399,124 @@ def find_foreign_money(text: str) -> list[str]:
             found.add(m.group(1).strip())
     return sorted(found)
 
+#: Any amount of money, in any currency.
+#:
+#: WHY THIS IS ABSOLUTE AND NOT A GROUNDING CHECK
+#: The dosage guard above redacts a dose only when it is ABSENT from the
+#: sources, because a dose that appears in an extension manual is a real
+#: recommendation. Money is different in kind: this system runs offline against
+#: a fixed corpus, so it cannot know what anything costs today. A figure the
+#: model invented is wrong, and a figure it read out of a 2019 CGIAR baseline is
+#: also wrong - it is a Kenyan shilling price from six years ago handed to a
+#: Nigerian farmer as though it were current. Neither is usable, so containment
+#: is not the test. Presence is.
+#:
+#: WHAT FORCED IT
+#: A long framed question about whether to sell maize now produced "the market
+#: price for maize in your region is around $0.40 per kilogram" - fabricated, in
+#: dollars, and claiming regional knowledge. The scope rules never saw it: they
+#: pattern-match short questions and this was a paragraph. An answer-side rule
+#: does not care how the question was phrased, which is the point.
+_MONEY = re.compile(
+    r"(?:"
+    # symbol or code, then a number:  $0.40   KSh 87   UGX 3000   N45,000
+    # Shilling codes vary by country and by writer: KSh, UShs, TShs, Ush.
+    # "UShs 426,377 per hectare" reached the interface because only UGX and
+    # KSh were listed.
+    r"(?:[$£€₦]|\bN|\b[KUT]?\.?Shs?|\bKES|\bTZS|\bUGX|\bZMW|\bMWK|"
+    r"\bGH\.?S|\bXOF|\bXAF|\bZAR|\bUSD|\bEUR|\bGBP|\bNGN)"
+    r"\s*\d[\d,.]*"
+    r"|"
+    # a number, then a currency name:  4,500 Kenyan shillings   1200 naira
+    r"\d[\d,.]*\s*(?:kenyan|ghanaian|nigerian|ugandan|tanzanian|zambian|malawian|south african|american|us|west african)?\s*(?:naira|kobo|dollars?|cents?|pounds?|euros?|"
+    r"shillings?|kwacha|cedis?|rand|francs?)"
+    r")",
+    re.IGNORECASE,
+)
+
+#: What replaces a redacted amount. Says what the system cannot do, rather than
+#: leaving a gap the reader fills in themselves.
+MONEY_REDACTION = "[this system has no price data - ask at your local market]"
+
+
+def find_money(text: str) -> list[str]:
+    """Monetary amounts appearing in `text`, in any currency."""
+    return [m.group(0) for m in _MONEY.finditer(text)]
+
+
+def redact_money(text: str) -> tuple[str, list[str]]:
+    """Replace every monetary amount. Returns `(cleaned, what_was_removed)`."""
+    found = find_money(text)
+    if not found:
+        return text, []
+    out = text
+    for amount in found:
+        out = out.replace(amount, MONEY_REDACTION)
+    return out, found
+
+#: Practices that are dangerous however confidently they are phrased.
+#:
+#: WHY THIS EXISTS
+#: Asked "can I reuse a pesticide container for water?" the system answered:
+#:
+#:     "No, reuse is not recommended. Use empty pesticide containers for other
+#:      uses. [1]"
+#:
+#: The first sentence is right and the second contradicts it. Reproduced in one
+#: run out of two. The source says not to reuse them; the model dropped the
+#: negation and emitted the instruction on its own.
+#:
+#: Container reuse is a documented cause of poisoning in exactly this setting -
+#: an empty drum becomes a water container, and the residue goes into whoever
+#: drinks from it. That harm lands on a household, not on the farmer who asked.
+#:
+#: A negation-dropping error is not something the containment guard can see: the
+#: words ARE in the sources. Only the polarity is wrong, and polarity is what
+#: F-23 already showed this model getting wrong on closed questions.
+_REUSE_CONTAINER = re.compile(
+    r"\b(?:re-?use|reusing|use|using|keep|store|fill)\w*\s+"
+    r"(?:the\s+|an?\s+|empty\s+|old\s+){0,3}"
+    r"(?:pesticide|chemical|agrochemical|herbicide|insecticide)\s+"
+    r"(?:container|containers|drum|drums|can|cans|bottle|bottles|jerr?y ?can)"
+    r"|"
+    # Words may sit between the container and its intended new use: "empty
+    # herbicide bottles can be USED TO HOLD drinking water".
+    r"\b(?:container|containers|drum|drums|bottle|bottles|jerr?y ?can)s?"
+    r"[^.!?]{0,40}?\b(?:hold|holding|store|storing|carry|carrying|keep|"
+    r"keeping|fetch|fetching|for|to)\s+(?:\w+\s+){0,2}(?:water|drinking|food|grain|milk|palm ?oil)",
+    re.IGNORECASE,
+)
+
+#: A negation anywhere in the same sentence makes it correct advice, not a
+#: dangerous instruction. "Do NOT reuse pesticide containers" must pass.
+_NEGATED = re.compile(
+    r"\b(?:not|never|don'?t|do not|avoid|should not|must not|no)\b",
+    re.IGNORECASE,
+)
+
+CONTAINER_REUSE_WARNING = (
+    "NEVER reuse a pesticide container for water, food or drink. Residue stays "
+    "in the container and has poisoned whole households. Puncture empty "
+    "containers and bury them away from water, or return them to the dealer."
+)
+
+
+def advises_container_reuse(answer: str) -> bool:
+    """Whether any SENTENCE tells the reader to reuse a chemical container.
+
+    Checked sentence by sentence, because the failure was a correct sentence
+    followed by a contradicting one - looking at the answer as a whole would
+    find the negation in the first sentence and clear the second.
+    """
+    for sentence in re.split(r"(?<=[.!?])\s+", answer):
+        if _REUSE_CONTAINER.search(sentence) and not _NEGATED.search(sentence):
+            return True
+    return False
+
 def check_answer(
     answer: str,
     source_texts: list[str],
+    question: str = "",
     source_years: list[str] | None = None,
     now: int | None = None,
 ) -> SafetyVerdict:
@@ -392,7 +560,17 @@ def check_answer(
 
     # A treatment named without a withdrawal period is unsafe for whoever
     # consumes the milk or meat - a person who never saw this advice.
-    if VETERINARY_TREATMENT.search(answer) and not WITHDRAWAL_MENTIONED.search(answer):
+    if advises_container_reuse(answer):
+        verdict.advises_container_reuse = True
+        verdict.safe = False
+
+    asks_about_withdrawal = bool(question) and bool(
+        WITHDRAWAL_QUESTION.search(question)
+    )
+    names_a_treatment = bool(VETERINARY_TREATMENT.search(answer))
+    if (names_a_treatment or asks_about_withdrawal) and not WITHDRAWAL_MENTIONED.search(
+        answer
+    ):
         verdict.missing_withdrawal_warning = True
         verdict.safe = False
 
