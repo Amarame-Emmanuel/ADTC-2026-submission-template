@@ -1343,11 +1343,34 @@ And it was found by running `make verify-offline` — a target whose purpose is 
 prove there is no network, not to check an answer — and *reading what it
 printed*. The proof passed. The answer inside it was wrong.
 
-**This is not fixed, and is recorded as limitation §7.24 rather than repaired
-in the last hours of the project.** The honest characterisation of the flagship
-case is: the retrieval defect is fixed and pinned by tests; the diagnosis that
-depends on it is unstable across runs and has never been measured as anything
-else.
+**Fixed, by the mechanism this file already had.** The cause was ordering, not
+retrieval: the mosaic passage was retrieved every time, at fused rank 4, while a
+chunk literally headed `Damage symptoms:` — whose body is brown streak — led at
+rank 1. A symptom question matched a passage titled "damage symptoms".
+
+`query.py` carries a **sign lexicon** mapping distinctive farmer language to the
+name of the thing it indicates, and passages carrying that name are promoted
+within the six already retrieved (§7.17). Nine signs had entries — cottony for
+mealybug, twisted neck for Newcastle, left-side swelling for bloat. **Yellow and
+twisted leaves, the textbook mosaic sign and the most-discussed question in this
+project, had none.** It was in the test suite as a MUST\_NOT\_FIRE control,
+proving that ordinary symptom language fired nothing.
+
+| Twelve runs, same question | before | after |
+|---|---|---|
+| Names **brown streak** | **4 / 12** | **0 / 12** |
+| Names no disease at all | 7 / 12 | 3 / 12 |
+| Names **mosaic** | 1 / 12 | **9 / 12** |
+
+Split-wide, nothing was spent to buy it: answer accuracy **93.9%**, `MISSED 0`,
+`UNGROUNDED 0`, `CONTRADICTED 0`, retrieval coverage **97.0%**, refusal **100%**
+— every figure identical to before the change. That matters because §6.11
+records four attempts at this same gap that improved one question and cost the
+split; this is the first that did not.
+
+The entry is the narrowest intervention available: same documents, same count,
+no new sources, only which of them the model reads first — deliberately the
+property that the per-document cap of F-17 disturbed and was reverted for.
 
 **And it caused a regression worth recording.** Re-chunking dropped test-split
 refusal from 100% to 66.7%: *"Which bank gives the best loan to farmers in Oyo
@@ -1617,7 +1640,7 @@ an attribution that would have broken the moment the question named a crop.
 
 ### 6.13 The test suite, and what it is actually for
 
-**833 tests.** The number is not a target and was not padded to one: an earlier
+**841 tests.** The number is not a target and was not padded to one: an earlier
 intention to reach ~1,000 was dropped, because the last two hundred came from
 real defects and writing tests with no defect behind them would have made the
 suite less informative, not more.
@@ -1707,7 +1730,7 @@ more than finding them hidden.
     be read as *coverage on directly-phrased questions*, which is a narrower
     claim than it appears.
 12. **Control advice is not retrieved for the flagship prompt.** The diagnosis is
-    unstable rather than correct (§6.8, §7.24), and `clean planting material`
+    now correct and stable (§6.8, §7.24), but `clean planting material`
     appears **zero times** in
     the passages sent to the model, though 90 cassava chunks carry control
     phrasing. **Four** approaches were measured and none shipped — §6.11 has the
@@ -1790,17 +1813,27 @@ more than finding them hidden.
     message has a validated Pidgin form. This one does not, and it is written
     by a speaker or not at all — a garbled refusal is worse than an English one
     a farmer can at least recognise as a refusal.
-24. **The flagship diagnosis is unstable across runs, and no metric sees it.**
-    Twelve runs of *"my cassava leaves are yellow and twisted"*: **4 name brown
-    streak** — the wrong disease — 7 name no disease at all, and 1 names mosaic
-    first (§6.8). Answer accuracy reads 93.9% with `UNGROUNDED: 0` throughout,
-    because the expected terms are control practices and the answer contains
-    them. **The single most-discussed example in this report is right about a
-    third of the time, and every automated check in the project reports
-    success.** It was found by reading the output of an offline-proof command
-    on the last day. Closing it means either a claim-level check (§7.19, not
-    built) or making the disease name a scored term rather than an incidental
-    one — neither attempted here.
+24. **~~The flagship diagnosis is unstable across runs, and no metric sees
+    it.~~ Fixed, and the second half is the part worth keeping.** Twelve runs of
+    *"my cassava leaves are yellow and twisted"* named brown streak — the wrong
+    disease — **4 times**, and mosaic once. It is now 0 and 9 (§6.8).
+
+    It went unseen because `expect_any` is satisfied by ANY expected term: the
+    answer said "whitefly", drawn from a passage about whiteflies, so it scored
+    **OK** while naming the wrong disease. Answer accuracy 93.9%, `UNGROUNDED
+    0`, every check green. `bench/answers.py` was built specifically to catch
+    what coverage could not, and it could not catch this.
+
+    `reject_any` — a term the answer must **not** contain — now marks such a
+    row **CONTRADICTED**, ranked above OK. It is not the claim-level check of
+    §7.19, which nobody has built; it catches the specific confusion a question
+    is known to invite, which is where the harm is. **Only crop-01 carries
+    reject terms.** Every other question in the set could hide the same defect,
+    and tagging them is unfinished work.
+
+    It was found by running `make verify-offline` — a target whose purpose is to
+    prove there is no network — and reading what it printed. The proof passed;
+    the answer inside it was wrong.
 
 ---
 
@@ -1811,7 +1844,7 @@ make build            # ubuntu:22.04 reference image
 make fetch-models     # checksum-verified weights (~1.2 GB, both models)
 make fetch-corpus     # vetted documents + provenance manifest
 make index            # build retrieval index
-make test             # the pytest suite (833 tests, §6.13)
+make test             # the pytest suite (841 tests, §6.13)
 make coverage         # retrieval coverage + refusal accuracy (dev split)
 make coverage ARGS="--split test"    # the held-out figures quoted in §6.0
 make answers          # answer-level accuracy (§6.9), not just retrieval

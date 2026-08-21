@@ -1458,7 +1458,7 @@ have been redacted out of a good answer.
 across 12 real answers.** Answer accuracy unchanged at 93.9%, UNGROUNDED 0.
 
 ### F-38 · The flagship diagnosis is unstable, and every metric is green
-**Severity: HIGH — OPEN.**
+**Severity: HIGH — FIXED, and the metric blindness is half-fixed.**
 
 F-06 and the report's §6.8 record that "my cassava leaves are yellow and
 twisted" answered Cassava Brown Streak Disease for textbook mosaic symptoms, and
@@ -1486,6 +1486,31 @@ and reading what it printed. The proof passed; the answer inside it was wrong.
 Three of the four worst defects in this project were found this way, by reading
 output while looking for something else.
 
-**Not fixed.** Closing it needs either the claim-level check that F-20 describes
-and nobody built, or making the disease name a scored term rather than an
-incidental one. Recorded as REPORT.md §7.24.
+**Fixed by a sign-lexicon entry.** The cause was ORDERING, not retrieval: the
+mosaic passage was retrieved every time at fused rank 4, while a chunk headed
+`Damage symptoms:` - whose body is brown streak - led at rank 1. A symptom
+question matched a passage literally titled "damage symptoms".
+
+`query.py` already maps distinctive farmer language to the name of the thing it
+indicates, and promotes passages carrying that name within the six retrieved.
+Nine signs had entries. Yellow-and-twisted leaves - the textbook mosaic sign,
+and the most-discussed question in this project - had none. It was in the test
+suite as a MUST_NOT_FIRE control, proving ordinary symptom language fired
+nothing.
+
+| twelve runs | before | after |
+|---|---|---|
+| names brown streak | 4/12 | **0/12** |
+| names no disease | 7/12 | 3/12 |
+| names mosaic | 1/12 | **9/12** |
+
+**Nothing was spent to buy it.** Answer accuracy 93.9%, MISSED 0, UNGROUNDED 0,
+CONTRADICTED 0, coverage 97.0%, refusal 100% - every figure identical to before.
+F-01 records four attempts at this same gap that improved one question and cost
+the split; this is the first that did not, because it reorders WITHIN the
+passages already retrieved rather than changing what is retrieved.
+
+**The metric blindness is only half closed.** `reject_any` now marks such a row
+CONTRADICTED, ranked above OK. But ONLY crop-01 carries reject terms. Every
+other question in the set could hide the same defect, and tagging them is
+unfinished. Recorded as REPORT.md §7.24.

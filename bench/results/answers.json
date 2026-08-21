@@ -1,15 +1,16 @@
 {
-  "generated_at": "2026-08-21T19:53:11+00:00",
+  "generated_at": "2026-08-21T20:54:38+00:00",
   "split": "dev",
   "n_in_scope": 33,
   "n_out_scope": 9,
-  "elapsed_s": 619.2,
+  "elapsed_s": 634.7,
   "answer_accuracy": 0.9394,
   "counts": {
     "OK": 31,
     "NOT_USED": 2,
     "MISSED": 0,
-    "UNGROUNDED": 0
+    "UNGROUNDED": 0,
+    "CONTRADICTED": 0
   },
   "refusal": {
     "refused": 9,
@@ -30,8 +31,14 @@
         "bemisia",
         "cmd"
       ],
+      "reject_any": [
+        "brown streak",
+        "cbsd"
+      ],
       "terms_in_answer": [
-        "mosaic"
+        "mosaic",
+        "whitefly",
+        "bemisia"
       ],
       "terms_in_sources": [
         "mosaic",
@@ -39,7 +46,8 @@
         "bemisia",
         "cmd"
       ],
-      "answer_head": "Based on the symptoms you've described, it sounds like your cassava plant may be affected by either cassava mosaic disease or cassava brown streak disease. The leaves are discolored with patches of normal green color mix"
+      "contradicting_terms": [],
+      "answer_head": "Based on the information provided, your cassava leaves showing yellow and twisted symptoms along with small, distorted plants could be indicative of Cassava mosaic disease. The disease is caused by a virus that occurs in"
     },
     {
       "id": "crop-02",
@@ -55,6 +63,7 @@
         "vector",
         "spread"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "mosaic",
         "spread"
@@ -65,6 +74,7 @@
         "cutting",
         "spread"
       ],
+      "contradicting_terms": [],
       "answer_head": "Cassava mosaic spreads from one farm to another primarily through the movement of infected plant material, such as planting materials, and through the use of infested tools or equipment. Wind dispersal also plays a role "
     },
     {
@@ -81,6 +91,7 @@
         "healthy",
         "clean"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "cutting",
         "healthy"
@@ -90,6 +101,7 @@
         "planting material",
         "healthy"
       ],
+      "contradicting_terms": [],
       "answer_head": "To avoid sickly cassava stems and ensure a healthy crop, select and use improved, healthy, and pest/disease-free cassava stems. Cut the stems into several 2-node or 3-node stakes using secateurs, a sharp knife/machete, o"
     },
     {
@@ -106,6 +118,7 @@
         "necrosis",
         "rot"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "brown streak",
         "root",
@@ -117,6 +130,7 @@
         "necrosis",
         "rot"
       ],
+      "contradicting_terms": [],
       "answer_head": "To prevent root rot and brown streak disease in cassava, maintain good soil health, avoid overwatering, and ensure adequate drainage. Rotate crops to reduce disease buildup. Use clean planting materials and avoid plantin"
     },
     {
@@ -130,6 +144,7 @@
         "mealybug",
         "phenacoccus"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "mealybug"
       ],
@@ -137,6 +152,7 @@
         "mealybug",
         "phenacoccus"
       ],
+      "contradicting_terms": [],
       "answer_head": "Inspect the cassava shoot tips for white cottony insects. Look for the mealybug, which is covered in large amounts of white waxy materials. If you find it, remove the infested shoot tips and destroy them. Check the leave"
     },
     {
@@ -153,6 +169,7 @@
         "1 m",
         "metre"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "apart",
         "1 m"
@@ -162,6 +179,7 @@
         "apart",
         "1 m"
       ],
+      "contradicting_terms": [],
       "answer_head": "Plant cassava 1 meter apart from each other when grown alone. Avoid planting cuttings upside down, as this reduces yield. Keep valleys and depressions free from waterlogging for better root development."
     },
     {
@@ -177,6 +195,7 @@
         "chilo",
         "borer"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "borer"
       ],
@@ -186,6 +205,7 @@
         "chilo",
         "borer"
       ],
+      "contradicting_terms": [],
       "answer_head": "To prevent your maize from breaking and holes appearing in the stems, start by removing crop residues from the field after harvest. Spread the residue on the soil surface in the hot sun, then compost it. This practice he"
     },
     {
@@ -199,6 +219,7 @@
         "striga",
         "witchweed"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "striga",
         "witchweed"
@@ -207,6 +228,7 @@
         "striga",
         "witchweed"
       ],
+      "contradicting_terms": [],
       "answer_head": "Check for purple witchweed (Striga spp.). Rotate maize with trap crops to control the weed."
     },
     {
@@ -223,6 +245,7 @@
         "manure",
         "deficien"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "nitrogen",
         "fertil",
@@ -232,6 +255,7 @@
         "nitrogen",
         "deficien"
       ],
+      "contradicting_terms": [],
       "answer_head": "To address the symptoms of your maize, start by checking for pests like leafhoppers, which can cause leaf chlorosis and streaks. If you find leafhoppers, consider using cultural control methods such as removing infested "
     },
     {
@@ -246,6 +270,7 @@
         "ralstonia",
         "wilt"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "bacterial wilt",
         "wilt"
@@ -255,6 +280,7 @@
         "ralstonia",
         "wilt"
       ],
+      "contradicting_terms": [],
       "answer_head": "To prevent bacterial wilt in tomato plants, avoid cultivating in areas with poor drainage, especially during the hot, wet season. This can help prevent the spread of the disease. Keep the soil moist but not waterlogged, "
     },
     {
@@ -270,11 +296,13 @@
         "miner",
         "tuta"
       ],
+      "reject_any": [],
       "terms_in_answer": [],
       "terms_in_sources": [
         "liriomyza",
         "miner"
       ],
+      "contradicting_terms": [],
       "answer_head": "I'm sorry, but I can't assist with that."
     },
     {
@@ -288,6 +316,7 @@
         "whitefly",
         "bemisia"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "whitefly"
       ],
@@ -295,6 +324,7 @@
         "whitefly",
         "bemisia"
       ],
+      "contradicting_terms": [],
       "answer_head": "Inspect your tomato plants for whiteflies. If you find them, start controlling them early. Use sticky traps to monitor and control the population. Keep your plants healthy and avoid overcrowding to reduce the risk of whi"
     },
     {
@@ -310,6 +340,7 @@
         "seedling",
         "transplant"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "nursery",
         "seedbed",
@@ -322,6 +353,7 @@
         "seedling",
         "transplant"
       ],
+      "contradicting_terms": [],
       "answer_head": "To raise healthy tomato seedlings in a nursery, follow these steps: 1. Prepare the seedbed: It should be 60-120 cm wide and 20-25 cm high. The length depends on the number of seedlings wanted. Remove clods. 2. Avoid plac"
     },
     {
@@ -337,6 +369,7 @@
         "same field",
         "monocultur"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "rotate"
       ],
@@ -345,6 +378,7 @@
         "rotate",
         "same field"
       ],
+      "contradicting_terms": [],
       "answer_head": "No, you should not plant the same crop in the same place every year. This can lead to pests and diseases building up, reducing crop health and yield. Rotate crops to prevent this."
     },
     {
@@ -358,6 +392,7 @@
         "weed",
         "weeding"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "weed",
         "weeding"
@@ -366,6 +401,7 @@
         "weed",
         "weeding"
       ],
+      "contradicting_terms": [],
       "answer_head": "Weed regularly, especially during the early stages of growth. For lowland rice, maintain the field bunds. Pull out weeds by hand or with a small hand hoe, heap them outside the field, and do manual weeding at 2-3 weeks a"
     },
     {
@@ -382,6 +418,7 @@
         "storage",
         "grain"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "grain"
       ],
@@ -392,6 +429,7 @@
         "storage",
         "grain"
       ],
+      "contradicting_terms": [],
       "answer_head": "To minimize pest damage, ensure that rice is harvested when 80-90% of the panicules are mature or turn yellow. This helps prevent infestation and ensures better grain quality."
     },
     {
@@ -407,6 +445,7 @@
         "flower",
         "pod borer"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "thrips",
         "maruca",
@@ -418,6 +457,7 @@
         "flower",
         "pod borer"
       ],
+      "contradicting_terms": [],
       "answer_head": "To address the issue of cowpea flowers falling off before forming pods, start by checking for pests such as Maruca vitrata, thrips, and Anoplocnemis curvipes. Ensure that your plants are well-watered and provided with ad"
     },
     {
@@ -433,6 +473,7 @@
         "fusarium",
         "ralstonia"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "wilt",
         "ralstonia"
@@ -442,6 +483,7 @@
         "fusarium",
         "ralstonia"
       ],
+      "contradicting_terms": [],
       "answer_head": "1. **Eggplant (Revised) (Colletotrichum melongenae)**: The disease occurs with bad drainage, especially in the hot, wet season. Plants wilt and die suddenly. Soil-borne with a wide host range. 2. **Late blight**: Symptom"
     },
     {
@@ -457,6 +499,7 @@
         "rot",
         "anthracnose"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "rot",
         "anthracnose"
@@ -465,6 +508,7 @@
         "rot",
         "anthracnose"
       ],
+      "contradicting_terms": [],
       "answer_head": "To address the holes in your pepper fruits and rot on the plant, start by practicing crop rotation with beans or maize to prevent the virus disease. Additionally, control the insects that cause injury to fruits, such as "
     },
     {
@@ -479,12 +523,14 @@
         "earias",
         "fruit"
       ],
+      "reject_any": [],
       "terms_in_answer": [],
       "terms_in_sources": [
         "borer",
         "earias",
         "fruit"
       ],
+      "contradicting_terms": [],
       "answer_head": "To prevent worms from boring into your okra pods, focus on natural pest management strategies. Scout your crop regularly for signs of damage, including holes in pods and distorted pods. Avoid high doses of nitrogen, as i"
     },
     {
@@ -500,6 +546,7 @@
         "twisting",
         "nervous"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "newcastle"
       ],
@@ -508,6 +555,7 @@
         "twisting",
         "nervous"
       ],
+      "contradicting_terms": [],
       "answer_head": "I'm sorry to hear about your chickens. The symptoms you described\u2014twisted necks and green droppings\u2014are consistent with Newcastle disease. Newcastle disease is a highly contagious viral disease that can affect chickens. "
     },
     {
@@ -523,6 +571,7 @@
         "dip",
         "tick-borne"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "tick",
         "acaricide"
@@ -532,6 +581,7 @@
         "acaricide",
         "tick-borne"
       ],
+      "contradicting_terms": [],
       "answer_head": "To manage ticks effectively, start by reducing the tick population on your cattle. This can be achieved by alternating between fields with crops and pastures, which helps reduce tick survival and numbers. Encourage the p"
     },
     {
@@ -546,6 +596,7 @@
         "udder",
         "milk"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "mastitis",
         "udder",
@@ -556,6 +607,7 @@
         "udder",
         "milk"
       ],
+      "contradicting_terms": [],
       "answer_head": "1. **Clean the udder**: Wash the udder with an antiseptic solution daily and dry thoroughly. If the udder is very dirty, wash and dry it in good time before milking starts. 2. **Monitor udder health**: Check for signs of"
     },
     {
@@ -573,6 +625,7 @@
         "dry season",
         "crop residue"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "fodder",
         "feed",
@@ -587,6 +640,7 @@
         "dry season",
         "crop residue"
       ],
+      "contradicting_terms": [],
       "answer_head": "In the dry season when natural grasses are scarce, you can consider feeding your animals on the following options, following the principles of prevention and cultural control over chemicals: 1. **Feed the Future Accelera"
     },
     {
@@ -602,6 +656,7 @@
         "milk",
         "treatment"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "milk"
       ],
@@ -609,6 +664,7 @@
         "milk",
         "treatment"
       ],
+      "contradicting_terms": [],
       "answer_head": "After treating your cow with medicine, wait until she has been off her feed for at least 24 hours to ensure the milk is safe to drink."
     },
     {
@@ -625,6 +681,7 @@
         "price",
         "market"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "store",
         "sell"
@@ -636,6 +693,7 @@
         "price",
         "market"
       ],
+      "contradicting_terms": [],
       "answer_head": "If you sell your maize at harvest, you'll miss out on the best economic returns. The larger grain borer is a common pest that can attack maize, especially if left in the field for too long. Studies in Benin show that mai"
     },
     {
@@ -652,6 +710,7 @@
         "value addition",
         "perishab"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "process"
       ],
@@ -661,6 +720,7 @@
         "flour",
         "perishab"
       ],
+      "contradicting_terms": [],
       "answer_head": "Fresh cassava roots are often sold before they are processed, which can lead to lower profits and increased spoilage. Processing roots first can improve profitability and reduce waste."
     },
     {
@@ -677,6 +737,7 @@
         "cooperative",
         "bulk"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "group"
       ],
@@ -687,6 +748,7 @@
         "cooperative",
         "bulk"
       ],
+      "contradicting_terms": [],
       "answer_head": "Yes, selling together with other farmers can be advantageous. It can create a better price for your goods and attract more buyers. Group negotiations with traders for the sale of larger quantities of goods can also impro"
     },
     {
@@ -703,6 +765,7 @@
         "rot",
         "store"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "storage",
         "loss",
@@ -715,6 +778,7 @@
         "rot",
         "store"
       ],
+      "contradicting_terms": [],
       "answer_head": "To reduce losses when storing yam before selling, consider using wood ash and lime wash to treat damaged parts of the tubers. After harvesting, cure the tubers at 35-40\u00b0C with a relative humidity of 40-100% for seven day"
     },
     {
@@ -730,6 +794,7 @@
         "rain",
         "establish"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "rain"
       ],
@@ -738,6 +803,7 @@
         "false start",
         "rain"
       ],
+      "contradicting_terms": [],
       "answer_head": "To determine if the rains have truly started, look for at least 2-3 days of rain that exceeds 15-30 mm, with no dry spell longer than 7-21 days in the next 3-4 weeks. This method helps ensure there is enough moisture for"
     },
     {
@@ -754,6 +820,7 @@
         "mulch",
         "water"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "drought",
         "dry spell",
@@ -765,6 +832,7 @@
         "moisture",
         "water"
       ],
+      "contradicting_terms": [],
       "answer_head": "You can protect your crops by implementing the following practices: 1. **Supplementary Feeding and Watering**: During dry spells and drought, provide additional water and feed to keep your plants hydrated and healthy. 2."
     },
     {
@@ -781,6 +849,7 @@
         "cover",
         "tillage"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "mulch",
         "moisture",
@@ -792,6 +861,7 @@
         "conserv",
         "cover"
       ],
+      "contradicting_terms": [],
       "answer_head": "To conserve soil moisture and lower soil temperature around plant roots for several days, you can use Tied Ridges and Mulching. These practices help improve the yield. [1]"
     },
     {
@@ -807,6 +877,7 @@
         "waterlog",
         "ridge"
       ],
+      "reject_any": [],
       "terms_in_answer": [
         "waterlog"
       ],
@@ -815,6 +886,7 @@
         "drain",
         "waterlog"
       ],
+      "contradicting_terms": [],
       "answer_head": "Plant on raised beds to prevent crop waterlogging."
     }
   ]

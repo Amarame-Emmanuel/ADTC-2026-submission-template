@@ -156,6 +156,30 @@ _DIAGNOSTIC_INTENT = "disease symptoms cause control management"
 #: doubt. "Yellow leaves" maps to a dozen causes and is not here; "cottony
 #: masses" maps to one. Every entry is a phrase a farmer would actually type.
 _SIGN_TO_NAME: tuple[tuple[str, str], ...] = (
+    # Cassava mosaic. Yellow, mottled leaves that are also twisted or
+    # distorted is the textbook sign, and it is the single most-discussed
+    # question in this project - yet it had no entry, while nine rarer signs
+    # did.
+    #
+    # Measured over twelve runs, the system named CASSAVA BROWN STREAK for
+    # these symptoms in 4, named no disease at all in 7, and named mosaic in 1.
+    # The mosaic passage was retrieved every time, at fused rank 4, while a
+    # passage headed "Damage symptoms:" whose body is brown streak led at rank
+    # 1 - a symptom query matching a chunk literally titled "Damage symptoms".
+    #
+    # This is the same shape as the bloat and foot rot entries below: the right
+    # passage is already retrieved and loses during generation, so promotion is
+    # enough and nothing new needs to be found.
+    #
+    # ORDER MATTERS in the pattern. It requires yellowing BEFORE distortion,
+    # which is how mosaic is described and is not how the okra leaf-curl
+    # question is phrased ("curling and turning yellow") - that question is
+    # about a different crop and must not be dragged onto cassava material.
+    (r"(?:leaf|leaves)[^.]{0,40}(?:yellow\w*|mottl\w*|pale patch\w*)"
+     r"[^.]{0,30}(?:twist\w*|distort\w*|crinkl\w*|misshap\w*)|"
+     r"(?:yellow\w*|mottl\w*)[^.]{0,25}and[^.]{0,25}"
+     r"(?:twist\w*|distort\w*|crinkl\w*)",
+     "cassava mosaic"),
     (r"cottony|cotton-?like|white waxy|waxy coating|white powdery mass", "mealybug"),
     (r"winding lines|wiggly lines|squiggly|tunnels? (?:in|inside) the leaves|"
      r"trails? (?:in|inside) the leaves|mines? in the lea", "leafminer"),

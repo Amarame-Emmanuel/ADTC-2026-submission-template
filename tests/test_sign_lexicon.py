@@ -36,6 +36,15 @@ from agbe.rag.query import _SIGN_TO_NAME, retrieval_query, sign_names
 
 #: One or more natural phrasings per entry. A farmer's words, not the corpus's.
 MUST_FIRE = [
+    # Cassava mosaic. These four were added when the entry was; the first was
+    # previously a MUST_NOT_FIRE control, back when no entry covered it and it
+    # served to prove that ordinary symptom language fires nothing. It is the
+    # single most-discussed question in this project, it was answered "cassava
+    # brown streak" in 4 runs of 12, and it now has a mapping of its own.
+    ("cassava mosaic", "My cassava leaves are yellow and twisted"),
+    ("cassava mosaic", "My cassava leaves are yellow and twisted and the plant is small"),
+    ("cassava mosaic", "The cassava leaf is mottled and distorted"),
+    ("cassava mosaic", "Leaves turning yellow and crinkled"),
     ("mealybug", "White cottony insects on the growing tip of my cassava"),
     ("mealybug", "There is a white waxy coating on the shoots"),
     ("leafminer", "White winding lines inside my tomato leaves"),
@@ -75,7 +84,16 @@ MUST_NOT_FIRE = [
     "When should I plant maize in Oyo State?",
     "Should I store my grain or sell it now?",
     "How do I grade tomatoes for market?",
-    "My cassava leaves are yellow and twisted",
+    # Near misses for the cassava mosaic entry. The pattern requires
+    # yellowing BEFORE distortion, which is how mosaic is described; the okra
+    # question says "curling and turning yellow" and is about a different
+    # crop, which must not be dragged onto cassava material.
+    "My okra leaves are curling and turning yellow with tiny insects underneath",
+    "My cassava leaves are yellow",
+    "The leaves are twisted",
+    "My maize has purple leaves",
+    "My cassava leaves have a shoestring appearance",
+    "Tomato leaves are curling downward",
     "What is the best spacing for cowpea?",
     "How do I dry my maize after harvest?",
     "My chickens are not laying eggs",

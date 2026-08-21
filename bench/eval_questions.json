@@ -21,6 +21,10 @@
         "whitefly",
         "bemisia",
         "cmd"
+      ],
+      "reject_any": [
+        "brown streak",
+        "cbsd"
       ]
     },
     {

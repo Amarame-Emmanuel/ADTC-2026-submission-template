@@ -38,6 +38,20 @@ coverage alone reports identically:
                cuttings) and "avoid overhead irrigation to reduce whiteflies",
                neither in any source.
 
+CONTRADICTED, the fifth verdict, outranks all of them including OK.
+
+`expect_any` is satisfied by ANY expected term, and that is what hid the worst
+answer this project has produced. Asked about textbook cassava mosaic symptoms,
+the system named Cassava Brown Streak Disease - the wrong disease, and the
+single defect this project has spent the most effort on - while also mentioning
+whitefly, an expected term, drawn from a passage about whiteflies. Verdict: OK.
+Answer accuracy: 93.9%. UNGROUNDED: 0. Every metric green.
+
+`reject_any` is a term the answer must NOT contain. It cannot verify a claim,
+which is what a real claim-level check would do and what nobody here built. It
+catches the specific confusion a question is known to invite - brown streak for
+mosaic - which is where the harm actually is.
+
 UNGROUNDED is the reason this file reports four numbers rather than one. It is
 the only automated check in the project that can catch the grounding guarantee
 being broken, and a rising count is a regression even when accuracy improves.
@@ -92,13 +106,31 @@ def evaluate(split: str = "dev", limit: int | None = None,
 
     for i, q in enumerate(in_scope, 1):
         expect = q.get("expect_any") or []
+        reject = q.get("reject_any") or []
         advice = engine.advise(q["question"])
         retrieved_text = " ".join(h.chunk.text for h in advice.hits)
 
         in_answer = _terms_present(advice.answer, expect)
         in_sources = _terms_present(retrieved_text, expect)
+        contradicted = _terms_present(advice.answer, reject)
 
-        if in_answer and in_sources:
+        # CONTRADICTED outranks every other verdict, including OK.
+        #
+        # `expect_any` is satisfied by ANY expected term, and that is what hid
+        # this. Asked about textbook cassava mosaic symptoms, the system named
+        # Cassava Brown Streak Disease - the wrong disease, the one defect this
+        # project has spent the most effort on - while mentioning whitefly,
+        # which is an expected term, from a passage about whiteflies. Verdict:
+        # OK. Answer accuracy 93.9%. UNGROUNDED 0.
+        #
+        # A term the answer must NOT say is the cheapest form of the
+        # claim-level check this project has repeatedly wanted and not built.
+        # It cannot verify a claim; it can catch the specific confusion that a
+        # question is known to invite, which is where the harm actually is -
+        # brown streak for mosaic, coccidiosis for Newcastle.
+        if contradicted:
+            verdict = "CONTRADICTED"
+        elif in_answer and in_sources:
             verdict = "OK"
         elif in_sources:
             verdict = "NOT_USED"
@@ -116,8 +148,10 @@ def evaluate(split: str = "dev", limit: int | None = None,
             "verdict": verdict,
             "refused": advice.refused,
             "expect_any": expect,
+            "reject_any": reject,
             "terms_in_answer": in_answer,
             "terms_in_sources": in_sources,
+            "contradicting_terms": contradicted,
             "answer_head": " ".join(advice.answer.split())[:220],
         })
         print(f"  {i}/{len(in_scope)}  {q['id']:<9} {verdict}", flush=True)
@@ -147,6 +181,7 @@ def evaluate(split: str = "dev", limit: int | None = None,
             "NOT_USED": counts["NOT_USED"],
             "MISSED": counts["MISSED"],
             "UNGROUNDED": counts["UNGROUNDED"],
+            "CONTRADICTED": counts["CONTRADICTED"],
         },
         "refusal": {
             "refused": refused_ok,
@@ -173,9 +208,19 @@ def print_report(r: dict) -> None:
     print(f"    NOT_USED    {c['NOT_USED']:>3}   evidence was in context, answer ignored it")
     print(f"    MISSED      {c['MISSED']:>3}   neither retrieved nor answered")
     print(f"    UNGROUNDED  {c['UNGROUNDED']:>3}   answer asserts what NO source contains")
+    print(f"    CONTRAD.    {c['CONTRADICTED']:>3}   answer names something the question rules out")
     print()
     print(f"  REFUSAL       {r['refusal']['value'] * 100:.1f}%  "
           f"({r['refusal']['refused']}/{r['refusal']['total']})")
+
+    if c["CONTRADICTED"]:
+        print("\n  CONTRADICTED - the answer named something this question rules out.")
+        print("  Ranked above OK: an answer can carry an expected term and still")
+        print("  name the wrong disease, which is how this went unseen at 93.9%.")
+        for row in r["rows"]:
+            if row["verdict"] == "CONTRADICTED":
+                print(f"    [{row['id']}] {row['question'][:66]}")
+                print(f"        said {row['contradicting_terms']} - ruled out by reject_any")
 
     if c["UNGROUNDED"]:
         print("\n  UNGROUNDED - the grounding guarantee in section 5 is being broken here:")
