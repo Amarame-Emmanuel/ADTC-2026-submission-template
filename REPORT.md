@@ -709,6 +709,11 @@ because a farmer told *why* they are being declined can act on it, and one told
 | **Out-of-scope crop** | *"how do I grow cashew?"* | Answering from material about a different crop risks the wrong advice |
 | **Personal decision / geography / in-domain** | *"should I quit farming?"*, questions from outside the service area, questions not about farming at all | The last three, checked after the specific rules have had first refusal |
 
+**All nine refuse in Nigerian Pidgin as well as English**, in strings written by
+a speaker rather than translated. That took four layers: the message, the rule
+firing on Pidgin at all, the normalisation feeding it, and detection selecting
+the language. Each had a defect, and each was hidden by the one above it (§7.23).
+
 The in-domain gate runs **last and only for English and Pidgin**. Its vocabulary
 is English, and applying it to Yoruba or Igbo refused questions the detector had
 just identified correctly — the gate blocking the languages the system exists to
@@ -1640,7 +1645,7 @@ an attribution that would have broken the moment the question named a crop.
 
 ### 6.13 The test suite, and what it is actually for
 
-**841 tests.** The number is not a target and was not padded to one: an earlier
+**918 tests.** The number is not a target and was not padded to one: an earlier
 intention to reach ~1,000 was dropped, because the last two hundred came from
 real defects and writing tests with no defect behind them would have made the
 suite less informative, not more.
@@ -1809,10 +1814,28 @@ more than finding them hidden.
     *cause* is unknown: nothing in the question or the retrieved passages
     explains why the model sometimes emits an immediate stop. `docs/FINDINGS.md`
     F-34.
-23. **The Pidgin harmful-intent refusal is still English.** Every other fixed
-    message has a validated Pidgin form. This one does not, and it is written
-    by a speaker or not at all — a garbled refusal is worse than an English one
-    a farmer can at least recognise as a refusal.
+23. **~~The Pidgin harmful-intent refusal is still English.~~ Fixed, along with
+    six others nobody had counted.** It was not one message but **seven**, and
+    they were not missing from the message set — they bypassed it, returning the
+    English text carried on the verdict from `scope.py`. A Pidgin speaker asking
+    how to poison a neighbour's animals, what a bag of maize is worth, or
+    whether to give up farming, got English. All seven were written by a
+    Nigerian Pidgin speaker on 2026-08-21 and are used verbatim.
+
+    **Wiring them up exposed three more layers, each independently sufficient to
+    serve English anyway, and each invisible until the one above it was fixed:**
+    two scope rules did not fire on Pidgin at all (*"How much be one bag of
+    maize now?"* and *"Make I stop farming?"* were **answered**), the
+    adulteration rule knew "heavier" but not the uninflected Pidgin "heavy", and
+    detection called four of these questions English — so the new messages were
+    correct and unreachable.
+
+    The rule-layer misses share a cause worth generalising: **`pidgin_norm` was
+    tuned to help retrieval, and the scope rules were later pointed at its
+    output.** A rewrite good enough for a bag-of-words match is not
+    automatically good enough for a regex expecting English grammar — *"Abi make
+    I leave farming?"* normalised to *"or so that I leave farming?"*, which is
+    fine for BM25 and unparseable by any rule. `docs/FINDINGS.md` F-39.
 24. **~~The flagship diagnosis is unstable across runs, and no metric sees
     it.~~ Fixed, and the second half is the part worth keeping.** Twelve runs of
     *"my cassava leaves are yellow and twisted"* named brown streak — the wrong
@@ -1844,7 +1867,7 @@ make build            # ubuntu:22.04 reference image
 make fetch-models     # checksum-verified weights (~1.2 GB, both models)
 make fetch-corpus     # vetted documents + provenance manifest
 make index            # build retrieval index
-make test             # the pytest suite (841 tests, §6.13)
+make test             # the pytest suite (918 tests, §6.13)
 make coverage         # retrieval coverage + refusal accuracy (dev split)
 make coverage ARGS="--split test"    # the held-out figures quoted in §6.0
 make answers          # answer-level accuracy (§6.9), not just retrieval

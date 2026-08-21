@@ -1514,3 +1514,57 @@ passages already retrieved rather than changing what is retrieved.
 CONTRADICTED, ranked above OK. But ONLY crop-01 carries reject terms. Every
 other question in the set could hide the same defect, and tagging them is
 unfinished. Recorded as REPORT.md §7.24.
+
+### F-39 · Four independent layers each sent a Pidgin speaker English
+**Severity: HIGH — FIXED.**
+
+Nine fixed messages were validated Pidgin. Seven others were not, and they were
+not MISSING from the message set - they bypassed it. `_scope_message` returned
+`verdict.message`, the English carried on the verdict from `scope.py`. So a
+Pidgin speaker asking how to poison a neighbour's animals, what a bag of maize
+is worth, or whether to give up farming, got English.
+
+The harmful-intent refusal was the worst of the seven. It is the only message
+answering a request to cause deliberate harm, and a refusal a farmer cannot read
+is one they will rephrase and try again.
+
+A speaker wrote all seven on 2026-08-21 and they are used verbatim.
+
+**Then the wiring exposed three more layers, each individually sufficient to
+serve English anyway.** Each was invisible until the one above it was fixed:
+
+| layer | failure |
+|---|---|
+| the RULE | "How much be one bag of maize now?" and "Make I stop farming?" were ANSWERED - both refuse in English |
+| the RULE, again | "How I go make my yam HEAVY before I sell am?" was answered; the adulteration rule knew only "heavier" |
+| DETECTION | "How much be...", "Which bank FIT GIVE me loan?", "Di blade... DON BLUNT", "How much I GO SELL" all detected as ENGLISH |
+
+The rule-layer misses share a cause worth stating generally: **`pidgin_norm` was
+tuned to help RETRIEVAL, and the scope rules were later pointed at its output.**
+A rewrite good enough for a bag-of-words match is not automatically good enough
+for a regex expecting English grammar. "Abi make I leave farming?" normalised to
+"or so that I leave farming?" - fine for BM25, unparseable by any rule. And
+normalisation is GATED on a Pidgin marker being present, so sentences that are
+Pidgin by word ORDER or by COPULA were never rewritten at all.
+
+**Fixed at the layer that can actually fire.** "make i" became a marker (English
+says "make ME"). The copula and future forms are handled in `scope.py` itself,
+because a normalisation rule for a sentence carrying no marker would be dead
+code that looks functional - which this project has shipped before.
+
+Detection gained three PATTERNS rather than more literal pairs, because a list
+of pairs is always one phrasing short - five "don X" pairs were listed and the
+farmer said "don blunt":
+
+    fit + bare verb    the modal:      "which bank FIT GIVE me loan"
+    don + word         the perfective: "di blade DON BLUNT"
+    i go + bare verb   the future:     "how much I GO SELL my maize"
+
+Each excludes the English readings ("does it fit?", "don't", "I go home").
+
+**A translation nothing routes to is not a translation.** The messages were
+correct and unreachable for three of these questions until detection was fixed,
+which is why the test file asserts the whole path - detect, normalise, rule,
+message - in one assertion rather than testing four layers separately.
+
+918 tests. Coverage 97.0%, refusal 100%, both unchanged.

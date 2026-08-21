@@ -98,12 +98,60 @@ _UNAMBIGUOUS_PHRASES = (
     "don get", "don begin", "don dey", "don start", "don come",
     "dey go", "dey come", "no be", "e be", "e dey", "e don",
     "wetin be", "how i go", "which one better", "make e",
+    # Copula questions. "X be Y" is the Pidgin equative and has no English
+    # reading - "how much be one bag of maize now?" and "who be president?"
+    # were both detected as ENGLISH, so a Pidgin speaker got English refusals
+    # even after the Pidgin ones had been written.
+    "how much be", "who be", "wey be", "na wetin", "e no be",
+)
+
+#: "fit" followed by a bare verb is the Pidgin modal - "which bank FIT GIVE me
+#: loan?" is "which bank CAN give me a loan?".
+#:
+#: A regex rather than a list of literal pairs because the verb is open-ended,
+#: and a list would go stale the first time a farmer used a verb nobody thought
+#: of. English "fit" takes a noun or a preposition - "fit for purpose", "does it
+#: fit?", "a fit animal" - never a bare infinitive, which is what makes this
+#: safe.
+#: "don" followed by a verb is the Pidgin perfective - "my cassava DON SPOIL",
+#: "di blade DON BLUNT", "weevil DON ENTER my beans".
+#:
+#: Five literal pairs were listed ("don get", "don start", ...) and the sixth
+#: phrasing a farmer used was not among them: "Di blade for my grinding machine
+#: don blunt" was detected as ENGLISH. A verb list will always be one verb
+#: short, so this matches any word after it.
+#:
+#: Safe because "don" is vanishingly rare in English farming text, and the
+#: required SPACE excludes "don't" - which `\bdon\b` alone would match, since a
+#: word boundary sits between the "n" and the apostrophe.
+#: "I go" followed by a bare verb is the Pidgin future - "how much I GO SELL my
+#: maize?", "wetin I GO USE?".
+#:
+#: "how i go" was already listed as a phrase, which caught "How I go take stop
+#: bird?" and missed "How MUCH I go sell my maize?" - one word in between, and
+#: a price question was answered instead of refused.
+#:
+#: The exclusions are where English does say "I go": to a place, home, out,
+#: back, from here. English never puts a bare infinitive after it.
+_GO_FUTURE = re.compile(
+    r"\bi go\s+(?!to\b|home\b|out\b|back\b|there\b|now\b|from\b|and\b|"
+    r"with\b|for\b|into\b|through\b|around\b|down\b|up\b|first\b|"
+    r"straight\b|ahead\b)[a-z]{2,}\b",
+    re.IGNORECASE,
+)
+
+_DON_PERFECT = re.compile(r"\bdon\s+[a-z]{2,}\b", re.IGNORECASE)
+
+_FIT_MODAL = re.compile(
+    r"\bfit\s+(?:give|help|do|make|come|go|use|tell|show|sell|plant|"
+    r"grow|work|carry|born|chop|cure|kill|stop|start|enter|reach|last)\b",
+    re.IGNORECASE,
 )
 
 _PHRASE_RX = tuple(
     re.compile(r"\b" + re.escape(p) + r"\b", re.IGNORECASE)
     for p in _UNAMBIGUOUS_PHRASES
-)
+) + (_FIT_MODAL, _DON_PERFECT, _GO_FUTURE)
 
 #: Multi-word markers, matched against the TEXT rather than the word set.
 #:

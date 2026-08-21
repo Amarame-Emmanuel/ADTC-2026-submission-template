@@ -127,20 +127,52 @@ class TestLanguageRouting:
 
 
 class TestValidatedMessages:
+    #: Fields whose ENGLISH text lives in agbe/rag/scope.py, beside the rule
+    #: that emits it, so `None` here means "no translation" rather than
+    #: "missing". `_scope_message` falls back to the English the verdict
+    #: already carries.
+    #:
+    #: They are optional rather than required because the alternative was a
+    #: second copy of seven English paragraphs, and a hand-maintained second
+    #: copy of a fact has gone wrong five times in this project.
+    SCOPE_BACKED = {
+        "harmful_request", "live_price", "financial_legal",
+        "mechanical_repair", "personal_decision", "out_of_area",
+        "out_of_domain",
+    }
+
     def test_every_validated_language_has_all_messages(self):
         english = MESSAGES["en"]
         for lang in VALIDATED_LANGUAGES:
             msgs = MESSAGES[lang]
             for field in english.__dataclass_fields__:
                 value = getattr(msgs, field)
+                if field in self.SCOPE_BACKED and value is None:
+                    continue
                 assert value and value.strip(), f"{lang}.{field} is empty"
+
+    def test_pidgin_has_every_scope_backed_refusal(self):
+        """A speaker wrote all seven on 2026-08-21. None may go missing.
+
+        Before that, a Pidgin speaker asking to poison a neighbour's animals,
+        or asking what maize is worth, got ENGLISH - because these seven
+        bypassed the message set entirely and returned scope.py's own text.
+        """
+        pcm = MESSAGES["pcm"]
+        for field in self.SCOPE_BACKED:
+            value = getattr(pcm, field)
+            assert value and value.strip(), f"pcm.{field} lost its Pidgin"
 
     #: Fields deliberately serving English to every language, because no
     #: speaker has reviewed a translation yet. Listed explicitly rather than
     #: skipped, so the debt is visible in the test file and has to be actively
     #: deleted from this set when a speaker approves a string - the failure
     #: mode this guards against is a gap nobody remembers.
-    PENDING_SPEAKER_REVIEW = {"harmful_request"}
+    #: Empty, and that is the point: it held "harmful_request" until a Pidgin
+    #: speaker wrote one on 2026-08-21. Kept rather than deleted because the
+    #: mechanism is what matters - a debt listed here has to be actively
+    #: removed when it is paid, and the test below fails if it is not.
+    PENDING_SPEAKER_REVIEW: set[str] = set()
 
     def test_pidgin_differs_from_english(self):
         """Guards against a language silently falling back to copied English."""
@@ -148,6 +180,8 @@ class TestValidatedMessages:
         for field in en.__dataclass_fields__:
             if field in self.PENDING_SPEAKER_REVIEW:
                 continue
+            # A scope-backed field is None in English by design; Pidgin
+            # carrying a string there is exactly what "differs" should mean.
             assert getattr(en, field) != getattr(pcm, field), field
 
     def test_pending_review_fields_are_genuinely_identical(self):

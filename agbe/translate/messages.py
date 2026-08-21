@@ -66,14 +66,26 @@ class MessageSet:
     live_forecast: str
 
 
-    #: Deliberately carries an English default rather than appearing in every
-    #: MessageSet. Every other string here was reviewed by a Nigerian Pidgin
-    #: speaker on 2026-08-07; this one was added later and has not been. The
-    #: documented fallback - English rather than an unreviewed translation -
-    #: is the right behaviour for a refusal, and get() already implements it.
-    #: Replace the default with a per-language string once a speaker has
-    #: approved one.
-    harmful_request: str = "I am sorry, but I cannot help with that."
+    #: Refusals whose English text lives in `agbe/rag/scope.py`, beside the rule
+    #: that emits it.
+    #:
+    #: `None` means "no translation for this language", and `_scope_message`
+    #: then falls back to the English the verdict already carries. That is why
+    #: these are Optional rather than required strings: the alternative was to
+    #: copy seven English paragraphs into this file, and a hand-maintained
+    #: second copy of a fact has gone wrong five times in this project - most
+    #: recently a currency list that existed in four places and leaked a price
+    #: to a farmer through the gap between them.
+    #:
+    #: So English is defined once, in scope.py, and this dataclass carries only
+    #: what a speaker has actually written.
+    harmful_request: str | None = None
+    live_price: str | None = None
+    financial_legal: str | None = None
+    mechanical_repair: str | None = None
+    personal_decision: str | None = None
+    out_of_area: str | None = None
+    out_of_domain: str | None = None
 
 
 MESSAGES: dict[str, MessageSet] = {
@@ -174,6 +186,49 @@ MESSAGES: dict[str, MessageSet] = {
             "Omo, I not fit tell you anything on this one o. I no get any "
             "forecast. You fit listen for your radio or go ask your extension "
             "officer sha"
+        ),
+        # The seven below were provided by the same Nigerian Pidgin speaker on
+        # 2026-08-21 and are used VERBATIM. Do not "tidy" them into textbook
+        # English word order - that is the whole point of having a speaker
+        # write them, and the machine-translated alternative was measured and
+        # rejected (it turned a livestock question into a human medical one).
+        harmful_request="I no fit help you with dat, sorry.",
+        live_price=(
+            "I no fit yan you today price, my papers na guide dem be, no be "
+            "market report, and price dey change every day. I fit help you sabi "
+            "wen to sell, how you go store your crop make e no lose value, and "
+            "how grading fit affect wetin dem go offer you. For today price, "
+            "make you ask for market or hala trader wey you sabi trust."
+        ),
+        financial_legal=(
+            "I no fit yan you about loans, land titles or registration. My "
+            "papers na about farm tins like crops, animals, weather, and market "
+            "dem. If I start to answer from there, e go be like say I dey guess "
+            "your money or your land. Abeg ask your bank, your local land "
+            "registry, or your extension officer, dem fit refer you."
+        ),
+        mechanical_repair=(
+            "I no fit help fix machine dem. My papers na about farm tins like "
+            "crops, animals, weather, and market dem, no be repair manual. So "
+            "anything wey I talk about your engine na just my guess. Abeg, make "
+            "you ask mechanic na. If na how to use or set farm machine you wan "
+            "ask, no be how to fix am, make you ask me like that again."
+        ),
+        personal_decision=(
+            "Na your own matter be dat, your land, your money, your family. My "
+            "papers na only for farming and animal keeping. I no fit weigh dem "
+            "for you. Abeg yarn am well with your extension officer or your "
+            "cooperative wey sabi your matter well well."
+        ),
+        out_of_area=(
+            "My papers na for small farm for southwest Naija, so I no fit give "
+            "correct advice for another country or climate. Abeg, ask that "
+            "extension officer wey dey your farm area."
+        ),
+        out_of_domain=(
+            "I dey answer only questions wey concern how to grow crops and take "
+            "care of animals for my documents. Abeg, make you hala your local "
+            "extension officer if you get any other gbege."
         ),
     ),
 }

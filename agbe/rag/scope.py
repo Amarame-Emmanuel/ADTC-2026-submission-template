@@ -216,7 +216,14 @@ _PRICE_METHOD = re.compile(
 
 _LIVE_PRICE = re.compile(
     r"\b(?:what(?:'s| is) the (?:current |today'?s? )?price|"
-    r"how much (?:is|does|are|do)[^?]*(?:cost|sell|selling|go(?:ing)? for)|"
+    # "be" is the Pidgin copula: "How much BE one bag of maize now?". Handled
+    # here rather than in pidgin_norm because normalisation is gated on a Pidgin
+    # MARKER being present, and that sentence has none - it is Pidgin by word
+    # order alone. A normalisation rule for it would have been dead code that
+    # looked functional, which this project has shipped before.
+    r"how much (?:is|does|are|do|be)[^?]*(?:cost|sell|selling|go(?:ing)? for)|"
+    r"how much be [^?]{0,30}(?:bag|basket|tonne|kg|kilo|crate|tuber|bunch|"
+    r"maize|corn|cassava|yam|rice|garri|tomato|pepper|okra|beans?|cowpea)|"
     r"price (?:of|for)[^?]*(?:today|now|currently|this week)|"
     r"(?:current|today'?s?|latest|market) price|"
     r"(?:what|how much)[^?]{0,60}\bsell(?:s|ing)? (?:for|at)\b|"
@@ -246,6 +253,13 @@ _LIVE_PRICE = re.compile(
     # whether to grade, whether to sell as chips - are untouched, because they
     # are answerable from extension material without knowing any price.
     r"(?:what|how much)[^?]{0,40}(?:price|worth|cost)|"
+    # "Dem dey buy cassava FOR HOW MUCH?" puts the interrogative last, which is
+    # ordinary Pidgin word order and survives normalisation intact. Every other
+    # branch here assumes the question word comes first.
+    # "How much I GO SELL my maize?" - Pidgin future, and the sentence carries
+    # no marker for pidgin_norm to gate on, same as the copula case above.
+    r"how much[^?]{0,20}(?:go|will|would) sell|"
+    r"(?:for|at) how much|"
     r"price (?:of|for|per)|"
     r"(?:fair|good|right|current|best) price|"
     r"what will i (?:get|make|earn)|"
@@ -467,7 +481,7 @@ _MACHINE = re.compile(
     # that USING a sprayer stays in scope - calibration and cleaning are
     # answered - because _MECHANICAL_FAULT must also match for a refusal.
     r"carburetor|battery|alternator|spark plug|"
-    r"sprayer|knapsack|nozzle|pressure gauge|hose)\b",
+    r"sprayer|knapsack|nozzle|pressure gauge|hose|blade|blades)\b",
     re.IGNORECASE,
 )
 
@@ -479,7 +493,12 @@ _MECHANICAL_FAULT = re.compile(
     # "My knapsack sprayer will not BUILD PRESSURE", and blocked or worn parts,
     # are mechanical faults phrased without any of the verbs above.
     r"build(?:ing)? pressure|no pressure|lose[sd]? pressure|blocked|clogg\w*|"
-    r"worn|jammed|stuck|dripping|making (?:a )?(?:noise|sound)|strange (?:noise|sound)|knocking|rattling)\b",
+    # "blunt" is how a blade fails, and "don blunt" is how Pidgin says it has.
+    # "Di blade for my grinding machine don blunt" was refused as OUT OF DOMAIN
+    # - right outcome, wrong reason, so the farmer got the generic message
+    # instead of the one that tells them to see a mechanic.
+    r"worn|blunt|dull|jammed|stuck|dripping|making (?:a )?(?:noise|sound)|"
+    r"strange (?:noise|sound)|knocking|rattling)\b",
     re.IGNORECASE,
 )
 
@@ -633,7 +652,12 @@ _ADULTERATE = re.compile(
     r"|"
     r"\b(?:weigh|weighs|weight)\w*\s+more\b[^?.!]{0,40}(?:sell|selling|sale|buyer|market)"
     r"|"
-    r"\bmake\b[^?.!]{0,30}\bheavier\b[^?.!]{0,30}(?:sell|selling|sale|buyer|market)",
+    # "heavy" as well as "heavier". Pidgin does not inflect the comparative:
+    # "How I go make my yam HEAVY before I sell am?" is the same request to
+    # defraud a buyer as "how do I make my yam heavier before selling", and it
+    # was ANSWERED while the English refused.
+    r"\bmake\b[^?.!]{0,30}\bheav(?:y|ier)\b[^?.!]{0,30}"
+    r"(?:sell|selling|sale|buyer|market)",
     re.IGNORECASE,
 )
 
@@ -786,7 +810,7 @@ def wrong_place(question: str) -> str | None:
 #: whole design serves, and a referral that assumes connectivity contradicts it.
 _LIFE_DECISION = re.compile(
     r"\b(?:"
-    r"should i (?:become|be|remain|continue as|stop being|quit|give up|"
+    r"should i (?:become|be|remain|continue as|stop being|stop|quit|give up|"
     r"leave|abandon)[^?]{0,20}(?:a )?(?:farm\w*|farming|agriculture)|"
     r"(?:is|would) farming (?:worth|right|good|a good|profitable) (?:it|for me)|"
     r"should i (?:expand|grow|scale|enlarge)[^?]{0,15}(?:my )?(?:farm|business)|"

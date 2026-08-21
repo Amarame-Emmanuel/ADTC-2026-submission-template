@@ -985,20 +985,33 @@ class AdvisoryEngine:
             return messages.dosage_refusal
         if verdict.reason == "human medical":
             return messages.human_medical
-        # Reasons without a translated string fall through to no_guidance
-        # below, which is safe but generic. These carry their own English
-        # text from scope.py until a speaker reviews a translation.
-        if verdict.reason in ("personal decision", "out of domain",
-                              "financial or legal", "mechanical repair",
-                              "live price") or verdict.reason.startswith(
-            "outside the service area"
-        ):
-            return verdict.message
+        # Seven refusals whose English lives in scope.py, beside the rule that
+        # emits it. `or verdict.message` is the fallback: a language with no
+        # translation gets the English the verdict already carries, rather than
+        # a generic "no guidance" that says nothing about WHY.
+        #
+        # All seven were English for every language until a Pidgin speaker
+        # wrote them on 2026-08-21. The harmful-intent refusal was the worst of
+        # the seven to leave untranslated: it is the only one that answers a
+        # request to poison a neighbour's animals or cheat a buyer, and a
+        # refusal a farmer cannot read is a refusal they will rephrase and
+        # retry.
+        translated = {
+            "personal decision": messages.personal_decision,
+            "out of domain": messages.out_of_domain,
+            "financial or legal": messages.financial_legal,
+            "mechanical repair": messages.mechanical_repair,
+            "live price": messages.live_price,
+        }
+        if verdict.reason in translated:
+            return translated[verdict.reason] or verdict.message
+        if verdict.reason.startswith("outside the service area"):
+            return messages.out_of_area or verdict.message
 
         if verdict.reason == "live forecast":
             return messages.live_forecast
         if verdict.reason.startswith("harmful request"):
-            return messages.harmful_request
+            return messages.harmful_request or verdict.message
         if verdict.reason.startswith("out-of-scope crop"):
             return messages.out_of_scope_crop
         return messages.no_guidance

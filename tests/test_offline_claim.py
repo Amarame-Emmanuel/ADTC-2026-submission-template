@@ -98,7 +98,13 @@ def test_no_refusal_message_sends_a_farmer_online() -> None:
     texts: list[tuple[str, str]] = []
     for lang, msgs in MESSAGES.items():
         for field in msgs.__dataclass_fields__:
-            texts.append((f"{lang}.{field}", getattr(msgs, field)))
+            value = getattr(msgs, field)
+            # None means "no translation for this language"; the English it
+            # falls back to is a scope.py constant, and the loop below covers
+            # those directly.
+            if value is None:
+                continue
+            texts.append((f"{lang}.{field}", value))
     for name in dir(scope_module):
         if name.endswith(("MESSAGE", "FALLBACK", "WARNING")):
             value = getattr(scope_module, name)

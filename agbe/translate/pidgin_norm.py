@@ -69,6 +69,15 @@ import re
 #: mis-steer retrieval, which is the failure mode this module exists to fix.
 _RULES: list[tuple[str, str]] = [
     # Multi-word markers, before their parts.
+    # "Make I stop farming?" is "SHOULD I stop farming?" - a question about the
+    # asker's own life. The general `make` rule below renders it "so that I",
+    # which is right for purpose ("wetin I go do MAKE my yam no rotten") and
+    # wrong here, and left the sentence in a shape no English rule could parse:
+    # the personal-decision rule refused "Should I leave farming?" and answered
+    # "Abi make I leave farming?".
+    #
+    # Ordered before `abi` and `make` because both would otherwise fire first.
+    (r"\b(?:abi\s+)?make\s+i\b", "should I"),
     (r"\bwetin dey worry\b", "what is wrong with"),
     (r"\bwetin be\b", "what is"),
     (r"\bwetin\b", "what"),
@@ -125,7 +134,14 @@ _COMPILED = [(re.compile(p, re.IGNORECASE), r) for p, r in _RULES]
 #: language to ANSWER in, this one decides whether rewriting would help. They
 #: answer different questions and should be free to disagree.
 _MARKERS = re.compile(
-    r"\b(?:dey|wetin|abeg|sabi|una|abi|naim|pikin|comot|waka|oga)\b",
+    r"\b(?:dey|wetin|abeg|sabi|una|abi|naim|pikin|comot|waka|oga)\b"
+    # "make I" is unambiguous: English says "make ME". Without it, "Make I stop
+    # farming?" carried no marker, was never normalised, and reached the scope
+    # rules as Pidgin they cannot parse - so a question about whether to give up
+    # farming was ANSWERED while "Should I leave farming?" refused.
+    #
+    # The boundary after "i" is what keeps "make it" and "make into" out.
+    r"|\bmake i\b",
     re.IGNORECASE,
 )
 
