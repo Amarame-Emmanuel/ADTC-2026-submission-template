@@ -12,16 +12,20 @@ Blocking problems are not filed here — those stop work and get raised directly
 |---|---|---|
 | — | **F-24** | **fixed — floor tolerance 0.05→0.08; the right passage was being discarded at 0.623 by 0.027** |
 | — | **F-23** | **fixed — polarity guard; both fabrications refuse, both correct Newcastle answers survive** |
-| **1** | **F-18** symptom returned as instruction | *"cut off seedlings at the base every night"* — guard built and tested, still uncommitted |
-| **2** | **F-15** fabricated claim, unmeasurable | the grounding check cannot see this class. **F-23 was its verified instance and is now guarded**; the general case is not |
-| 3 | **F-17** one document takes every slot | cap built, measured, reverted — coherence beat coverage |
-| 4 | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
-| 5 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
-| 6 | **F-20** topic drift | cutworm question answered damping-off too |
-| 7 | **F-21** livestock species leak | aquaculture passages in goat and chicken answers |
-| 8 | **F-27** out-of-scope crops cannot be demoted | **partly fixed — answer accuracy 90.9% → 97.0%, confirmed twice**; a doc titled by PATHOGEN still leaks |
-| 9 | **F-28** spurious model refusal on a clean question | ~17% of generations return "I'm sorry, but I can't assist with that"; reads as NOT_USED to the metric |
-| **1** | **F-30** refusal depends on the index, not the question | **19 of 40 out-of-scope prompts answered**; "who is the president of Nigeria" -> a false, cited claim |
+| — | **F-18** | **fixed and shipped in 07e9f4f — the guard is live on all three entry points** |
+| **1** | **F-15** fabricated claim, unmeasurable | the grounding check cannot see this class. F-23 and F-31 are guarded instances; the general case is not |
+| 2 | **F-17** one document takes every slot | cap built, measured, reverted — coherence beat coverage |
+| 3 | **F-14** source-digest answers | one fix measured and rejected (−9 points) |
+| 4 | F-01 control advice | **4 approaches measured and declined**; one untried (score-weighted fusion). Read §6.11 first |
+| 5 | **F-20** topic drift | cutworm question answered damping-off too |
+| 6 | **F-21** livestock species leak | aquaculture passages in goat and chicken answers |
+| 7 | **F-27** out-of-scope crops cannot be demoted | **partly fixed — answer accuracy 90.9% → 97.0%, confirmed twice**; a doc titled by PATHOGEN still leaks |
+| 8 | **F-28** spurious model refusal on a clean question | ~17% of generations return "I'm sorry, but I can't assist with that"; reads as NOT_USED to the metric |
+| — | **F-30** | **fixed — in-domain gate; 19 of 40 answered → 1 of 40, and 36 of 39 refusals now come from a RULE rather than the floor** |
+| **1** | **F-32** the gate refused the languages it serves | Igbo and Yoruba questions declined as *out of domain* by an English-only rule — **fixed**, but it shipped for two days |
+| 9 | **F-33** a guard can be weaker in streaming than in tests | money redaction never fired in the interface; unit tests passed on whole strings |
+| 10 | **F-34** empty generation on a lethal condition | bloat produced NOTHING in 2 of 5 runs — **retry added, ~40% → ~10%** |
+| — | **F-31** | **fixed — plural and inflection misses in four separate rules; see below** |
 | — | **F-25**, **F-26** | **fixed — see below; F-26 is why a guard could be live for farmers and invisible to the metric** |
 | — | **F-02** | **fixed — sign lexicon; answer accuracy 87.9% → 93.9%** |
 | — | **F-13** | **probed and declined — costs 0.4 points, benefit unproven** |
@@ -1178,8 +1182,148 @@ added makes more out-of-scope questions clear the floor. That directly opposes
 §3's "bigger corpus, smaller model" recommendation on this one axis, and the
 opposition was not visible until out-of-scope input was tested deliberately.
 
-**Not fixed.** The shape of a fix is an in-domain gate ahead of retrieval -
-cheap, testable, and the inverse of every existing rule: instead of enumerating
-what to refuse, require evidence of what to accept. Section 6 of the review
-records what already works and must not regress: 4/4 on meta-questions, 4/5 on
-nonsense, 6/6 on general knowledge, 5/5 on the listed crops.
+**FIXED.** The in-domain gate was built as described: it requires evidence of
+farming rather than enumerating what to refuse, and it runs LAST so that every
+specific rule keeps its more useful message.
+
+Re-running the same forty prompts:
+
+| | before | after |
+|---|---|---|
+| refused by a **scope rule** | 6 | **36** |
+| refused by the **floor** (an index accident) | 15 | 3 |
+| **answered** | **19** | **1** |
+
+The claim this finding is named for is now false: refusal is a property of the
+QUESTION. "Who is the president of Nigeria?" refuses in 0.0 s instead of
+returning "Muhammadu Buhari [1]".
+
+The one survivor is `cassava cassava cassava cassava cassava` - degenerate
+repetition of an in-scope word. It is left alone deliberately: catching it means
+guessing what someone meant to type.
+
+Two rules were added alongside it, because each gives a more useful message than
+the generic gate: out-of-scope crops gained pineapple, watermelon, mango, papaya
+and ten others, and a geography rule declines questions naming a country or a
+climate this corpus does not serve - "when should I plant maize in Scotland?"
+had invented a planting month.
+
+**The gate then caused F-32**, which is worse than what it fixed. Read that
+before treating this as closed.
+
+### F-31 · The same substring and plural bug, in five separate rules
+**Severity: medium — FIXED, and the fix is a test rather than a patch.**
+
+One defect written five times, on five different days, in five rules:
+
+| rule | pattern | matched |
+|---|---|---|
+| polarity guard | `\bban\b` with no leading boundary | "**ban**ana" |
+| harmful intent | `his` with no leading boundary | "t**his**" year |
+| Pidgin phrases | `"e be"` tested with `in` | "th**e be**st" |
+| in-domain gate | `chicken` + `\b` | not "chicken**s**" |
+| field context | `tassel`, `flower` | not "tassel**s**", "flower**ing**" |
+
+The first three are a missing leading `\b`; the last two a missing plural. Each
+was found by hand, patched, and the lesson was not carried across - a guard
+against it existed as an assertion in one test file while the next rule was
+written with the same hole.
+
+**The third instance is the instructive one.** It was found by an audit script
+that fired ordinary farming sentences at every rule - and that script was then
+deleted as a temporary file. Two rules later the same bug appeared again.
+
+So the fix is `tests/test_guard_boundaries.py`: that audit, made permanent. It
+fires sentences carrying the substrings that bite - this, their, weather, other,
+gather, banana, mother, the best - at every rule that can refuse or alter an
+answer, and fails if any reacts.
+
+**Proven by re-injection.** All three variants were put back one at a time to
+confirm the guard catches them. The first two failed the suite immediately. The
+third did NOT - the file tested `scope.check` but nothing fired substring traps
+at the language DETECTOR - which is how a guard written to stop this class was
+found to have the same class of gap. `ENGLISH_SUBSTRING_TRAPS` closed it.
+
+**Consequence, honestly.** The plural half is not covered by that suite: a rule
+that fails to FIRE is invisible to a test built on rules firing wrongly. Those
+two were found by reading UI answers, and there is still no cheap check for them.
+
+### F-32 · The in-domain gate refused the languages the system serves
+**Severity: HIGH — FIXED. It shipped in 07e9f4f and was live for two days.**
+
+The gate added for F-30 refuses any question naming no farming word. Its
+vocabulary is English - cassava, goat, harvest, spray - so applied to Yoruba or
+Igbo it refused questions the detector had just identified correctly:
+
+    "Kedu mgbe m ga-aku oka?"   (when should I plant maize)  -> out of domain
+    "Ewu m adighi eri nri"      (my goat is not eating)      -> out of domain
+
+while an Igbo question that happened to contain the loanword "cassava" passed.
+
+A fix for one problem creating a worse one is the shape to notice here. F-30 was
+a fabricated political claim; F-32 is a farmer being told their question is not
+about farming, in a language the submission claims to support. It would have
+surfaced in a demo as "the multilingual system only answers English".
+
+The gate now steps aside for languages it has no vocabulary for. The retrieval
+floor remains the relevance check, exactly as it was before the gate existed.
+English out-of-domain still refuses - verified on all four F-30 cases.
+
+**Yoruba had a second, independent bug.** `_MIN_SCRIPT_CHARS = 2` was written for
+ACCENTS, which French and Portuguese also carry. But s-underdot, u-underdot and
+i-underdot are not accents - they are letters occurring in no European language
+and no English text. Requiring two of them sent Yoruba to the English path. One
+is now decisive, and where only the shared vowels appear - genuinely ambiguous
+between Yoruba and Igbo - the answer is no longer "English", because those
+letters demonstrably are not English.
+
+**Hausa was added** on the same footing: detection only, English messages, no
+machine translation. It fits where Twi and French do not - it is Nigerian, so it
+does not collide with the service-area rule that declines Ghanaian questions.
+
+### F-33 · A guard can be weaker in the interface than in its tests
+**Severity: HIGH — FIXED for money; the CLASS is open.**
+
+The money redaction was built, unit-tested and passing. It never fired in the
+interface. Two answers reached a farmer carrying "US$204 per hectare" and
+"KSh$81.21 per 50 kg bag".
+
+The cause is token boundaries. The model streams `$` and `204` as SEPARATE
+pieces, and the guard began buffering only when a piece contained a DIGIT. So
+`$` had already been sent before the guard woke, leaving the buffer holding
+"204 per hectare" - which the pattern cannot match without the symbol. The unit
+tests passed because they call `redact_money` on a whole string.
+
+**Any answer-side guard that matches across a token boundary has this weakness**,
+and no unit test can see it. Currency marks now trigger buffering, and
+`UShs`/`TShs`/`Ush` were added after a second probe found Ugandan shilling
+figures leaking - only `UGX` and `KSh` had been listed.
+
+**Not fully clean.** The redaction can leave a stray currency letter: "a gross
+margin of U[this system has no price data...]" - the `U` arrived in an earlier
+token than the one that triggered buffering. No FIGURE escapes; a letter can.
+
+**Open:** the dosage containment guard matches across token boundaries the same
+way and has not been probed for this.
+
+### F-34 · Nothing generated, on a condition that kills in hours
+**Severity: HIGH — mitigated, not solved.**
+
+"My goat left side is swollen and tight after grazing wet grass" produced an
+EMPTY answer in 2 of 5 runs. Six passages retrieved, the bloat guidance in them,
+and no tokens generated. Bloat kills within hours by pressing on the diaphragm.
+
+An earlier guard turned the blank into an honest refusal, which is right and
+still leaves the farmer turned away when the answer was sitting there.
+
+Generation is now retried ONCE. That is safe for a specific reason: while the
+head buffer is holding, NOTHING has been sent to the caller, so a second attempt
+cannot duplicate or contradict a first. The buffering built to strip citation
+dumps is what makes the first attempt discardable. Bounded at one - an unbounded
+retry turns a stalled model into a hang, and an honest refusal beats a spinner.
+
+**Measured: ~40% empty before, ~10% after** (8 of 10 useful, 1 empty).
+
+**Still open.** One in ten farmers asking about bloat gets no advice, and the
+cause of the empty generation is unknown - nothing in the question or the
+retrieved passages explains why the model sometimes emits an immediate stop.

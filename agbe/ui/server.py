@@ -147,7 +147,9 @@ async def ask(question: Question, request: Request) -> StreamingResponse:
         # sent ~2,100-token prompts at 65s to first token. The generation
         # loop below it had been copy-pasted too; it now lives in ONE place,
         # engine.guarded_stream().
-        hits, texts, _comp = engine.retrieve_and_compress(question.text)
+        hits, texts, _comp = engine.retrieve_and_compress(
+            question.text, language=language
+        )
 
         if not hits:
             # The refusal path. Emitted as its own event so the interface can

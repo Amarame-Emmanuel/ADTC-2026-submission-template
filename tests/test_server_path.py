@@ -63,7 +63,7 @@ class StubEngine:
         self.calls: list[str] = []
         self.pieces = ["Feed the goats ", "fresh forage ", "twice daily."]
 
-    def retrieve_and_compress(self, question: str, top_k=None):
+    def retrieve_and_compress(self, question: str, top_k=None, language="en"):
         self.calls.append("retrieve_and_compress")
         hits = [SearchHit(chunk=_chunk("Goats need fresh forage twice daily."),
                           score=0.81, rank=0)]

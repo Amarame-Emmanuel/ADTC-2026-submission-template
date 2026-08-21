@@ -52,6 +52,7 @@ from agbe.rag.embedder import Embedder
 from agbe.rag.index import SearchHit, VectorIndex
 from agbe.rag.query import retrieval_query, with_diagnostic_intent
 from agbe.translate.pidgin_norm import for_retrieval as pidgin_for_retrieval
+from agbe.translate.farm_terms import for_retrieval as farm_terms_for_retrieval
 from agbe.rag.safety import (
     SafetyVerdict,
     check_answer,
@@ -574,7 +575,7 @@ class AdvisoryEngine:
     # how the web server shipped without those fixes. retrieve_and_compress()
     # is the only retrieval entry point.
     def retrieve_and_compress(
-        self, question: str, top_k: int | None = None
+        self, question: str, top_k: int | None = None, language: str = "en"
     ) -> tuple[list[SearchHit], list[str], dict]:
         """Retrieve, then cut each passage to the sentences that answer the query.
 
@@ -596,8 +597,16 @@ class AdvisoryEngine:
         # patterns in query.py are written against. English questions pass
         # through pidgin_norm byte-identically, so the benchmarked English
         # path is unchanged.
+        # Yoruba, Igbo and Hausa get their farm vocabulary mapped to English
+        # BEFORE the query is built. Measured without it, eleven of twelve
+        # questions in those languages retrieved ZERO passages - the corpus and
+        # the embedder are English, so the question was a bag of tokens the
+        # index had never seen. See agbe/translate/farm_terms.py; English and
+        # Pidgin are gated out and their paths stay byte-identical.
         search_text = with_diagnostic_intent(
-            retrieval_query(pidgin_for_retrieval(question))
+            retrieval_query(
+                farm_terms_for_retrieval(pidgin_for_retrieval(question), language)
+            )
         )
         query_vector = self.embedder.embed_query(search_text)
         hits = self.index.hybrid_search(
@@ -784,7 +793,9 @@ class AdvisoryEngine:
 
     def stream(self, question: str, top_k: int | None = None) -> Iterator[str]:
         """Stream an answer: retrieve, compress, then the shared guarded loop."""
-        hits, texts, _comp = self.retrieve_and_compress(question, top_k=top_k)
+        hits, texts, _comp = self.retrieve_and_compress(
+            question, top_k=top_k, language=language
+        )
         if not hits:
             yield NO_GUIDANCE_MESSAGE
             return
@@ -843,7 +854,9 @@ class AdvisoryEngine:
                 language=language,
             )
 
-        hits, texts, comp = self.retrieve_and_compress(question, top_k=top_k)
+        hits, texts, comp = self.retrieve_and_compress(
+            question, top_k=top_k, language=language
+        )
         if not hits:
             return Advice(
                 question=question,

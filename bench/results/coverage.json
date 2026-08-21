@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T10:58:26+00:00",
+  "generated_at": "2026-08-21T18:41:28+00:00",
   "machine": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
     "processor": "x86_64",
@@ -31,8 +31,8 @@
     "total": 9
   },
   "retrieval_latency_ms": {
-    "p50": 124.34,
-    "p95": 153.36
+    "p50": 116.35,
+    "p95": 132.01
   },
   "per_crop": {
     "cassava": {
