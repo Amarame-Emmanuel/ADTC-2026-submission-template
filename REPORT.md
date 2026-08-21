@@ -2,7 +2,8 @@
 
 **Africa Deep Tech Challenge 2026 · Agriculture track**
 Offline English/Nigerian-Pidgin crop and livestock advisory for smallholder
-farmers on an 8 GB laptop.
+farmers on an 8 GB laptop. Yoruba, Igbo and Hausa are detected and retrieved
+for; they are answered in English (§7.5).
 
 > **Status of this document.** Every number here is a measurement produced by a
 > committed script, reproducible with the commands in §8. Nothing is a figure we
@@ -28,6 +29,15 @@ farmers on an 8 GB laptop.
 > §6.9 adds the answer-level number, which is **6.7 points lower** than the
 > coverage figures quoted throughout §6.
 >
+> **Three of the corrections were safety failures, and none was found by a**
+> **metric.** A price in Zambian kwacha, a dollar figure, and four of five
+> veterinary doses all reached the interface through guards that passed every
+> unit test — because a unit test calls the guard on a whole string and a
+> stream never has one (§5). They were found by re-running questions through
+> the interface and reading the answers, which is also how the two defects in
+> §6.3 and §6.8 were found. **Every metric in this document was green
+> throughout.**
+>
 > Known limitations are in §7, including things a reader might otherwise assume
 > work.
 
@@ -52,7 +62,9 @@ documents.
 
 A smallholder farmer growing **cassava, maize, yam, tomato, rice, cowpea,
 groundnut, pepper or okra**, or keeping **poultry, goats or cattle**, asking in
-**English or Nigerian Pidgin**, describing what they see in ordinary language —
+**English or Nigerian Pidgin** — or in **Yoruba, Igbo or Hausa**, which are
+detected and retrieved for but answered in English (§3.2) — describing what they
+see in ordinary language —
 *"my cassava leaves are yellow and twisted"*, *"my chickens are dying with
 twisted necks"* — not in diagnostic terminology.
 
@@ -73,7 +85,7 @@ The domain is **Agriculture**, and all four of its advisory areas are in scope:
 | **Crop** | Disease and pest identification, cultural and chemical control, agronomy, post-harvest |
 | **Livestock** | Poultry, small ruminants and cattle — disease signs, husbandry, feeding, vaccination |
 | **Weather** | Planting calendars, season onset, dry-spell and flooding response, moisture conservation |
-| **Market** | Store-or-sell decisions, grading, aggregation, value addition, loss reduction, gross margin |
+| **Market** | Store-or-sell decisions, grading, aggregation, value addition, loss reduction, why prices move seasonally — **judgement, not figures**: no price is quoted, ever (§6.12) |
 
 ### The distinction that governs scope
 
@@ -91,10 +103,19 @@ do is supply the live fact itself:
 | *"How many ml of insecticide in my sprayer?"* | Product- and registration-specific; NAFDAC data is not openly published |
 | *"How many ml of antibiotic for my goat?"* | Depends on product, concentration and body weight; wrong doses harm the animal and leave residues in milk and meat |
 
-For genuinely live data the design is **sync-when-connected, use-offline**: a
-farmer with intermittent signal can sync a price or forecast file and the system
-reasons over it offline for days. That matches the actual access pattern —
-connectivity is *intermittent*, not absent — better than refusing outright.
+There is no sync path, no cached feed and no deferred fetch. The system is
+offline in the strong sense — it has no network code at all, and §8 proves it
+by running the whole application under `--network none`. An earlier draft of
+this section described a *sync-when-connected* design for prices and forecasts.
+It was removed because it was not built, and describing an unbuilt capability
+beside measured ones is the kind of claim that makes a reader doubt the
+measured ones too.
+
+So the boundary is drawn once and held: **the four refusals above are refused
+permanently, not pending a connection.** The refusal messages say so, and they
+say what the system *can* do instead — for price, that it can help decide when
+to sell, how storage protects value, and how grading affects what a farmer is
+offered.
 
 A system that claims everything is a demo. One that knows precisely what it
 cannot answer, and why, is an instrument.
@@ -666,15 +687,51 @@ complete.
 This system gives advice about pesticides. The failure modes are harmful, not
 embarrassing.
 
-| Rule | Guards against |
+Safety is enforced in two places, and the distinction matters because they fail
+differently. A **question-side** rule declines before any retrieval happens and
+costs nothing when it fires. An **answer-side** guard inspects what the model
+actually produced, and is the only thing standing between a farmer and a
+fabricated figure in an answer to a question that looked harmless.
+
+**Question-side: nine rules, checked in order.** Each returns its own message,
+because a farmer told *why* they are being declined can act on it, and one told
+"I cannot help" cannot.
+
+| Rule | Declines | Because |
+|---|---|---|
+| **Human medical** | *"my child has a fever"* | Not an agricultural question, and the harm of guessing is unbounded |
+| **Harmful intent** | Harming a neighbour's crop or animals, deceiving a buyer, adulterating produce, evading a prohibition | Four categories, each refused outright |
+| **Price** | *"what is a bag of maize worth?"* | Offline against a fixed corpus: no price is knowable, current or otherwise |
+| **Dosage** | *"how many ml of ivermectin for my goat?"* | Product-, concentration- and weight-specific; ~25 named actives plus category terms |
+| **Forecast** | *"will it rain next week?"* | Requires a live feed that does not exist here |
+| **Financial / legal** | *"which bank gives the best farm loan?"* | Someone's money and someone's land, from policy papers not written to advise them |
+| **Mechanical repair** | *"my motorcycle engine will not start"* | Machine noun *and* fault verb, so sprayer calibration still passes |
+| **Out-of-scope crop** | *"how do I grow cashew?"* | Answering from material about a different crop risks the wrong advice |
+| **Personal decision / geography / in-domain** | *"should I quit farming?"*, questions from outside the service area, questions not about farming at all | The last three, checked after the specific rules have had first refusal |
+
+The in-domain gate runs **last and only for English and Pidgin**. Its vocabulary
+is English, and applying it to Yoruba or Igbo refused questions the detector had
+just identified correctly — the gate blocking the languages the system exists to
+serve. For other languages the retrieval floor remains the check on relevance,
+as it was before the gate existed.
+
+**Answer-side: what the model wrote, checked before it is shown.**
+
+| Guard | Guards against |
 |---|---|
 | **Grounded generation + citations** | Fluent invention from parametric memory |
 | **Refusal below similarity floor** | Answering questions the corpus cannot support |
 | **Invented-dosage redaction** | The highest-risk hallucination available |
+| **Money redaction** | Any monetary figure, in any currency, in either word order — see below |
 | **Hazardous-active detection** | WHO Class Ia/Ib and Rotterdam Annex III compounds present in older literature |
 | **Chemical recency suppression** | Faithfully citing 1990s advice for a now-banned compound |
 | **Veterinary withdrawal warning** | Naming a treatment without the milk/meat withdrawal period |
 | **Restricted veterinary drugs** | Chloramphenicol, nitrofurans and similar, still present in older livestock material |
+| **Container-reuse guard** | Advice to reuse a pesticide container, checked sentence by sentence |
+| **Polarity guard** | A closed question the retrieved passages cannot actually settle |
+| **Citation-dump strip** | An answer that is nothing but a block of `[1] [2] [3]` |
+| **Prompt-echo stops** | The model continuing the prompt instead of answering it |
+| **Empty-generation retry** | A blank answer on a condition that kills in hours |
 
 **Why the withdrawal rule is enforced in code rather than left to the prompt.**
 Every other failure here harms the person who asked, who can at least weigh the
@@ -686,11 +743,55 @@ opportunity to judge it. That asymmetry justifies a hard check.
 treated as *stale*, not assumed recent. Failing in the safe direction is the
 whole point.
 
-**Streaming vs. checking.** Safety checking wants a finished answer; streaming
-wants to emit immediately. The compromise: prose streams token-by-token, but as
-soon as a digit appears, output buffers to the end of the sentence and is checked
-against sources before release. The one span capable of causing physical harm is
-never displayed unverified; everything else stays responsive.
+**Streaming vs. checking, and the three ways it went wrong.** Safety checking
+wants a finished answer; streaming wants to emit immediately. The compromise:
+prose streams token-by-token, but as soon as a digit or a currency mark appears,
+output buffers to the end of the sentence and is checked against the sources
+before release. The one span capable of causing physical harm is never displayed
+unverified; everything else stays responsive.
+
+That is the design. Getting it to hold took three corrections, and each was
+invisible to the unit tests, because **a unit test calls the guard on a whole
+string and the interface never has one.**
+
+1. **The trigger was too narrow.** The model emits `$` and `204` as separate
+   pieces. Buffering on digits alone meant the `$` had already been sent, so the
+   buffer held `204 per hectare` — which the money pattern cannot match without
+   the symbol. `US$204 per hectare` and `KSh$81.21 per 50 kg bag` both reached
+   the interface this way while every test passed.
+
+2. **The currency list was four lists.** Three in `safety.py` and a fourth in
+   `advisor.py`, drifted apart exactly as four copies of a list do. Codes were
+   matched only *before* a number, so `KSh 100` was redacted and `100 KSh` was
+   not. All four carried `ZMW`, the current Zambian code, while the corpus was
+   written when it was `ZMK` — so a real answer read *"the local market price
+   per kilogram is ZMK 8"* and no guard knew the word. **A currency list
+   covering only currencies still in use will always lag a corpus of documents
+   written in the past.** They are now one list.
+
+3. **The token itself splits, and no per-piece test survives that.** With the
+   list fixed, `ZMK 8` *still* reached the farmer in two of three runs — while
+   `find_money` run over the same finished answer found it. The guard was
+   correct and the stream defeated it: the model emits `Z`, `MK`, ` 8`, so no
+   single piece looks like money, and by the time the digit woke the guard the
+   code was already sent. Widening what *starts* buffering cannot reach this;
+   the trigger is in a piece that is gone.
+
+   The stream now holds **24 characters** back and folds that tail into the
+   buffer when buffering starts, so the guard can look *backwards* across a
+   split token. Measured: **2 leaks in 12 interface runs before, 0 in 12
+   after.** The tail is covered by tests that stream one *character* at a time
+   — the worst case — and that assert the full text survives, because an answer
+   silently missing its last few characters would be a worse defect than the
+   leak and would show up in no metric.
+
+**Why money is redacted unconditionally.** Not only invented figures. This
+system is offline against a fixed corpus, so an invented price and a six-year-old
+price read faithfully out of a source are equally unusable to someone deciding
+what to sell for today — and the second is more dangerous, because it is
+grounded, citable, and wrong. Dosages are the opposite: a dose *in the sources*
+is the best information available and is kept, so redaction there is conditional
+on containment.
 
 **The refusal rules are now the whole of the refusal path, and that was not
 always true.** Every one of the 17 out-of-scope evaluation questions is declined
@@ -724,6 +825,51 @@ The fix adds ~25 named veterinary and agricultural actives, with the category
 terms kept as backstop and the refusal message unchanged: it still tells the
 farmer to read the label and ask an extension officer, because the list cannot
 be exhaustive and should not pretend otherwise.
+
+**And the backstop behind it did not hold either.** The rule above declines
+dosage *questions*. The answer-side guard is what catches a dose appearing in an
+answer to a question that was not dosage-shaped — and streamed through the
+interface, four of five ordinary dose sentences passed through untouched:
+
+| Answer text | Seen by the guard |
+|---|---|
+| *"Give 5 ml of ivermectin per 50 kg body weight"* | **no** |
+| *"Inject 2.5 mg/kg of oxytetracycline once daily"* | **no** |
+| *"Apply 250 ml of the chemical per hectare"* | **no** |
+| *"Drench with 10 ml per animal"* | **no** |
+| *"Use 1.5 litres per hectare"* | yes |
+
+The cause was not the token boundary it was suspected of. Every rate pattern
+required a per-**area** unit — hectare, acre, m², litre — so the guard covered
+crop spray rates and left **veterinary dosing, the higher-harm half, entirely
+open**. `mg` was not a unit it knew. Neither were tablets, sachets, drops or cc.
+
+A dose comes in three shapes and only one was handled:
+
+| Shape | Example |
+|---|---|
+| rate | *2 litres per hectare*, *5 ml per 50 kg body weight* |
+| ratio | *2.5 mg/kg*, *1 ml/10 kg* |
+| **bare** | *Give 5 ml of ivermectin.* — no "per" anywhere |
+
+The bare shape is the dangerous one and the hardest to match safely, because a
+number and a unit on their own are also how ordinary advice is written. It is
+keyed on an administration **verb** near the quantity, and refuses to fire when
+the unit is followed by a noun that makes the quantity descriptive — *"a 20 kg
+goat"*, *"a 50 kg bag"*.
+
+**Matching is not redacting, and that is what makes generosity safe.**
+`find_dosages` proposes; containment against the retrieved sources disposes. A
+dose that *is* in the sources is the best information available and is kept.
+But that only works if the match is the **quantity** and not the sentence around
+it: capturing the whole span made containment compare *"Use 500 ml"* against a
+source reading *"500 ml / ha"*, so a correctly grounded rate was reported as
+invented and would have been redacted out of a good answer. The quantity is
+captured on its own for exactly that reason.
+
+**Measured: 4 of 5 leaking before, 0 of 5 after — and 0 spurious redactions
+across 12 real answers** covering bloat, armyworm, mosaic, compost, Newcastle
+disease, storage, fertiliser rate, spacing, wilt and safe spraying.
 
 **Mechanical repair** was added for the same reason — *"how do I fix my
 motorcycle engine"* and *"the engine on my water pump will not start"* were also
@@ -1162,10 +1308,46 @@ model read what it was given and named the only disease present.
 
 | | before | after |
 |---|---|---|
-| Diagnosis | Cassava Brown Streak | **Cassava Mosaic Disease** |
+| Diagnosis (single run — see below) | Cassava Brown Streak | **Cassava Mosaic Disease** |
 | Dev coverage | 93.3% | **96.7%** |
 | Weather corpus gaps | 2 | **0** |
 | Off-crop docs in top 6 | yes | reduced |
+
+**That diagnosis row is one run, and repeating it does not support the claim.**
+Re-measured at the close of the project, twelve runs of the same question
+through the same path:
+
+| What the answer names | runs |
+|---|---|
+| **Brown streak** first, or brown streak alone | **4 / 12** |
+| No disease named at all — generic cultural advice | 7 / 12 |
+| Mosaic first | 1 / 12 |
+
+So the fix in this section is real — the chunk boundary was genuinely wrong and
+is genuinely repaired — but **"the diagnosis is now correct" was never
+established, because it was measured once.** A third of the time this system
+still names the wrong disease for textbook mosaic symptoms, and more than half
+the time it names none, which is the control-advice gap of §6.11 seen from a
+different angle.
+
+Two things about how this was found are worth more than the number itself.
+
+It survived because **every metric was green**: answer-level accuracy reads
+93.9% with `UNGROUNDED: 0` and `MISSED: 0`, because the expected terms for this
+question are control practices and the answer does contain them. Naming the
+wrong disease while giving broadly reasonable cultural advice is invisible to
+every automated check in this project. §6.9 exists to catch what coverage
+cannot, and this is a defect it in turn cannot catch.
+
+And it was found by running `make verify-offline` — a target whose purpose is to
+prove there is no network, not to check an answer — and *reading what it
+printed*. The proof passed. The answer inside it was wrong.
+
+**This is not fixed, and is recorded as limitation §7.24 rather than repaired
+in the last hours of the project.** The honest characterisation of the flagship
+case is: the retrieval defect is fixed and pinned by tests; the diagnosis that
+depends on it is unstable across runs and has never been measured as anything
+else.
 
 **And it caused a regression worth recording.** Re-chunking dropped test-split
 refusal from 100% to 66.7%: *"Which bank gives the best loan to farmers in Oyo
@@ -1389,6 +1571,74 @@ The gap remains open and is recorded in `docs/FINDINGS.md` as F-01. The
 untried idea is score-weighted rather than rank-weighted fusion; the probe puts
 the distance to close at 0.023–0.065.
 
+### 6.12 A refusal rule can only drift in the direction no test is watching
+
+Market is one of the four advisory areas this system declares. It is also the
+area a blanket price refusal is most likely to destroy, and it nearly did.
+
+The price rule was widened — correctly, in principle, since an offline system
+cannot know any price — until it refused two questions that had been checked by
+hand as must-answer weeks earlier:
+
+| Question | Verdict | What it actually asks for |
+|---|---|---|
+| *"How do I decide what price to ask for my maize?"* | refused, `live price` | a **method** |
+| *"Where can I get a better price for my cassava?"* | refused, `live price` | a **channel** |
+
+Neither needs a figure, and both are answerable from extension material by a
+system that knows no prices at all.
+
+**Nothing caught it, and the reason generalises.** The refusal-recall suite
+guards the must-**refuse** side of price thoroughly. Nothing guarded the
+must-**answer** side. So an over-reaching pattern passed every test in the
+project while quietly removing the useful half of a whole advisory area — and it
+could only drift in the one direction no test was watching. A refusal rule needs
+both lists or it is only half-tested, and the half that is missing is the half
+that removes capability rather than adding it.
+
+The two were caught by two *different* branches of the rule — `what price` and
+`price for` — so the fix keys on the question's **opener** (*how do I*, *where
+can I*, *why do*, *what makes*) rather than patching branches one at a time; a
+third phrasing would have been caught by a third branch.
+
+**Measured, twenty market questions: 18 answered, 2 refused, and the 2 are
+exactly the ones asking for a figure.** Judgement, timing, grading, channels,
+cooperatives and why prices move seasonally all answer. Two more — *"why do
+buyers reject my produce?"* and *"how do I know if a buyer is cheating me on
+weight?"* — refuse at the retrieval floor, which is a corpus gap honestly
+reported rather than a rule.
+
+One further detail worth recording: *"What are people paying nowadays?"* **was**
+refused, but by the in-domain gate rather than the price rule, because it names
+no farming word. Same outcome, worse message — the farmer got "no guidance in my
+documents" instead of the explanation that this system has no price data — and
+an attribution that would have broken the moment the question named a crop.
+**Refusing for the right reason is not the same as refusing.**
+
+### 6.13 The test suite, and what it is actually for
+
+**833 tests.** The number is not a target and was not padded to one: an earlier
+intention to reach ~1,000 was dropped, because the last two hundred came from
+real defects and writing tests with no defect behind them would have made the
+suite less informative, not more.
+
+Three of the files exist to stop a *class* of bug rather than an instance, and
+they are the ones worth describing:
+
+| File | Stops |
+|---|---|
+| `test_guard_boundaries.py` | Any rule firing on ordinary farming language. Fires sentences carrying the substrings that have bitten before — *this*, *their*, *weather*, *banana*, *the best* — at every rule that can refuse or alter an answer |
+| `test_source_hygiene.py` | Control characters in source files. A `` written through a shell heredoc reaches disk as a 0x08 backspace; the pattern still compiles, matches nothing, and fails **silently** |
+| `test_stream_lookbehind.py` | A guard that works on a whole string and fails on a stream. Streams one *character* at a time and asserts both that money is redacted and that no text is lost |
+
+`test_source_hygiene.py` earned its place twice more during this work, catching
+a corrupted `` before it could compile into a pattern that silently matched
+nothing. `test_guard_boundaries.py` was itself found to have the gap it exists
+to prevent — it fired substring traps at the scope rules but not at the language
+detector, which is where the third instance of that bug was living.
+
+---
+
 ## 7. Known limitations
 
 Stated because a reviewer will find them anyway, and finding them stated is worth
@@ -1406,12 +1656,21 @@ more than finding them hidden.
    but a bias to correct with other sources rather than inherit silently.
 4. **The corpus filter is hand-tuned.** Thresholds are judgement, not fitted
    values. See §4.5.
-5. **No translation model ships.** Yoruba, Hausa and Igbo are *not* supported.
-   The NLLB bridge in `agbe/translate/nllb.py` was converted and measured, then
-   rejected: it improved Pidgin retrieval by nothing at all for ~740 MB, and
-   mistranslated one livestock question into a human medical one (§3.2). No
-   code path uses it. Nigerian Pidgin is delivered through validated fixed
-   strings plus zero-cost query normalisation instead.
+5. **No translation model ships, and Yoruba, Igbo and Hausa get English
+   answers.** The NLLB bridge in `agbe/translate/nllb.py` was converted and
+   measured, then rejected: it improved Pidgin retrieval by nothing at all for
+   ~740 MB, and mistranslated one livestock question into a human medical one
+   (§3.2). No code path uses it.
+
+   What the three languages *do* get is detection, a place in the scope rules,
+   and a farm-vocabulary lexicon that appends English equivalents to the query
+   before retrieval — measured **2/12 → 9/12** questions retrieving sources.
+   What they do **not** get is an answer in their own language, or validated
+   safety messages: those exist for English and Pidgin only, and a refusal in
+   the wrong language is the one message it is least acceptable to garble.
+   **Claiming these three as "supported" would overstate it; claiming they are
+   unsupported now understates it.** The honest statement is: a Yoruba speaker
+   gets a real answer to a real question, in English, from English sources.
 6. **No live data.** Weather, prices and current registrations are out of scope by
    design (§1).
 7. **Pidgin retrieval is weaker than English, and measured on five questions.**
@@ -1431,7 +1690,12 @@ more than finding them hidden.
    one chunk while the disease name lives in others, so it sits near every
    threshold boundary. It is a useful canary and is kept in the evaluation set
    for that reason.
-10. **50 evaluation samples for ARC-Easy** carries ±6% uncertainty (§3.3).
+10. **~~50 evaluation samples for ARC-Easy carries ±6% uncertainty.~~ Closed.**
+    ARC-Easy is now run over the **whole 2,376-question test set** (±1.8 pp).
+    The entry is kept rather than deleted because the reason it was wrong
+    matters: `arc[:limit]` takes nested slices of an ordered file, so a small
+    `limit` was a *biased* estimate and not merely a noisy one — questions
+    201–1,000 score 0.755 against the first 200's 0.685 (§6.0).
 11. **The evaluation set under-represents long, framed questions.** Every one of
     the 70 questions is short and direct, the way we write questions. Our own
     submitted test prompt is long and framed, the way a *judge* writes one — and
@@ -1443,7 +1707,8 @@ more than finding them hidden.
     be read as *coverage on directly-phrased questions*, which is a narrower
     claim than it appears.
 12. **Control advice is not retrieved for the flagship prompt.** The diagnosis is
-    now correct (§6.8), but `clean planting material` appears **zero times** in
+    unstable rather than correct (§6.8, §7.24), and `clean planting material`
+    appears **zero times** in
     the passages sent to the model, though 90 cassava chunks carry control
     phrasing. **Four** approaches were measured and none shipped — §6.11 has the
     detail, including the one that produced the best single answer and the worst
@@ -1453,17 +1718,6 @@ more than finding them hidden.
     §6.** Coverage measures retrieval; §6.9 measures the answer. The remaining
     3.1-point gap is two `NOT_USED` questions on the dev split — evidence was in
     the context and the model did not use it. `MISSED` is now 0 (§6.10).
-19. **`UNGROUNDED: 0` does not mean the system does not fabricate.** The check
-    only fires when an *expected* term appears without a source, so a confident
-    claim about something the corpus does not discuss is invisible to it. One
-    such claim — *"there are no vaccines available for Newcastle disease in
-    Nigeria"* — was found by hand on a configuration this metric scored 0
-    (§6.9). A claim-level check would close it and has not been built.
-20. **Answers are structured as source digests.** Six retrieved passages produce
-    six numbered paragraphs, one summarising each, rather than one answer.
-    Instructing the model to synthesise fixed the shape and cost 9 points of
-    answer accuracy, so it was rejected; the cause is how sources are presented,
-    not how the model is instructed. `docs/FINDINGS.md` F-14.
 14. **The dev/test split was not stable when questions were added — fixed, and
     the fix moved the split once.** `bench/split.py` promised that "adding a
     question later assigns it to a side without disturbing anything already
@@ -1505,6 +1759,48 @@ more than finding them hidden.
     `MISSED` at 0 while `NOT_USED` rose from 2 to 7, because the compressor
     followed the padding away from the sentences naming the pest. Coverage
     cannot see this; only §6.9's answer-level metric can.
+19. **`UNGROUNDED: 0` does not mean the system does not fabricate.** The check
+    only fires when an *expected* term appears without a source, so a confident
+    claim about something the corpus does not discuss is invisible to it. One
+    such claim — *"there are no vaccines available for Newcastle disease in
+    Nigeria"* — was found by hand on a configuration this metric scored 0
+    (§6.9). A claim-level check would close it and has not been built.
+20. **Answers are structured as source digests.** Six retrieved passages produce
+    six numbered paragraphs, one summarising each, rather than one answer.
+    Instructing the model to synthesise fixed the shape and cost 9 points of
+    answer accuracy, so it was rejected; the cause is how sources are presented,
+    not how the model is instructed. `docs/FINDINGS.md` F-14.
+
+21. **A guard can be weaker in the interface than in its tests, and this class
+    is open.** Three separate leaks reached a farmer through a guard that
+    passed every unit test, because a unit test calls the guard on a whole
+    string and the stream never has one (§5). Each was found by re-running
+    questions through the interface and reading the output — not by any metric.
+    The money path is now covered by character-by-character tests; **every
+    other answer-side guard that matches across a token boundary has the same
+    weakness and has not been probed the same way.** `docs/FINDINGS.md` F-33,
+    F-36.
+22. **Roughly one in ten answers on one livestock question is still empty.**
+    Generation is retried once, taking the failure rate from ~40% to ~10%, and
+    the blank is turned into an honest refusal rather than a blank screen. The
+    *cause* is unknown: nothing in the question or the retrieved passages
+    explains why the model sometimes emits an immediate stop. `docs/FINDINGS.md`
+    F-34.
+23. **The Pidgin harmful-intent refusal is still English.** Every other fixed
+    message has a validated Pidgin form. This one does not, and it is written
+    by a speaker or not at all — a garbled refusal is worse than an English one
+    a farmer can at least recognise as a refusal.
+24. **The flagship diagnosis is unstable across runs, and no metric sees it.**
+    Twelve runs of *"my cassava leaves are yellow and twisted"*: **4 name brown
+    streak** — the wrong disease — 7 name no disease at all, and 1 names mosaic
+    first (§6.8). Answer accuracy reads 93.9% with `UNGROUNDED: 0` throughout,
+    because the expected terms are control practices and the answer contains
+    them. **The single most-discussed example in this report is right about a
+    third of the time, and every automated check in the project reports
+    success.** It was found by reading the output of an offline-proof command
+    on the last day. Closing it means either a claim-level check (§7.19, not
+    built) or making the disease name a scored term rather than an incidental
+    one — neither attempted here.
 
 ---
 
@@ -1515,9 +1811,13 @@ make build            # ubuntu:22.04 reference image
 make fetch-models     # checksum-verified weights (~1.2 GB, both models)
 make fetch-corpus     # vetted documents + provenance manifest
 make index            # build retrieval index
+make test             # the pytest suite (833 tests, §6.13)
 make coverage         # retrieval coverage + refusal accuracy (dev split)
 make coverage ARGS="--split test"    # the held-out figures quoted in §6.0
 make answers          # answer-level accuracy (§6.9), not just retrieval
+make probe-coverage   # adversarial probe set - expected to score WORSE
+make probe-answers    # the same probes, answer-level
+make thermal          # 20-minute sustained load, throughput decay (§6.7)
 make submission       # build submission/model/ from the pinned weights
 make verify-submission # check the pin, the app and metadata.json agree
 make bench            # memory, latency, throughput
@@ -1535,11 +1835,15 @@ files whose throughput difference §3.3b rests on, so a judge would have
 either failed to find the declared file or silently benchmarked away the entire
 `S_perf` case.
 
-That is the **fourth** time in this project that a hand-maintained copy has
+That is the **fifth** time in this project that a hand-maintained copy has
 disagreed with its source — after the web UI's duplicated generation loop,
-`models.lock.json` pinning a model the application did not load, and the results
-table of §6.0 being transcribed rather than generated. The pattern is always two
-places holding one fact and only one of them being updated.
+`models.lock.json` pinning a model the application did not load, the results
+table of §6.0 being transcribed rather than generated, and the currency list
+that existed in **four** places at once and leaked a price to a farmer through
+the gap between them (§5). The pattern is always two places holding one fact and
+only one of them being updated — and it has now cost this project a broken
+submission bundle, a wrong headline table, and a real safety failure, which is
+why the fix each time is to delete the copy rather than to synchronise it.
 
 `make submission` now builds the bundle from `models.lock.json` and verifies
 that the three places naming the model agree: the pin, `agbe/config.py`, and

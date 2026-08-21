@@ -112,19 +112,72 @@ HAZARDOUS_ACTIVES = {
 # prefix ("l" inside "litres"), and every unit takes an optional plural - the
 # original patterns missed "2 litres per hectare", which is how the rate is
 # actually written in extension literature.
+#: Units a dose is measured in.
+#:
+#: mg, cc, tablets, sachets, capsules and spoons were all missing. A guard that
+#: knows litres and not milligrams does not cover veterinary medicine, which is
+#: where the harm is worst.
 _UNIT = (
     r"(?:millilitres?|milliliters?|litres?|liters?|kilograms?|kilogrammes?|"
-    r"grammes?|grams?|ml|kg|g|l|oz|lb)"
+    r"milligram(?:me)?s?|grammes?|grams?|teaspoons?|tablespoons?|"
+    r"tablets?|capsules?|sachets?|boluses|bolus|scoops?|drops?|caps?|"
+    r"ml|mls|cc|mg|kg|g|l|oz|lb|tsp|tbsp|iu|ppm)"
 )
+
+#: What a rate is expressed PER.
+#:
+#: Body weight and per-animal were missing, so "5 ml per 50 kg body weight" and
+#: "10 ml per animal" - the two commonest ways to write a livestock dose - were
+#: invisible. So were the sprayer volumes a farmer actually measures into.
 _PER_UNIT = (
     r"(?:hectares?|acres?|plants?|trees?|stands?|square\s+metres?|"
-    r"litres?|liters?|ha|m2|l)"
+    r"litres?|liters?|gallons?|ha|m2|l|"
+    r"kilogram(?:me)?s?|kg|body\s*weight|bw|"
+    r"animals?|birds?|heads?|goats?|sheep|cows?|cattle|calf|calves|"
+    r"chickens?|hens?|chicks?|pigs?|rams?|ewes?|bucks?|"
+    r"knapsacks?|sprayers?|tanks?|drums?|buckets?|rows?|holes?|mounds?|"
+    r"bags?|seeds?|cuttings?|days?|weeks?|doses?|treatments?)"
+)
+
+#: Verbs that mean a quantity is being ADMINISTERED rather than described.
+#:
+#: Needed because the dangerous shape has no "per" in it at all. "Give 5 ml of
+#: ivermectin" is a complete dose and matched none of the rate patterns, which
+#: all require a per-AREA unit - so the guard covered crop spray rates and left
+#: veterinary dosing, the higher-harm half, entirely open.
+_ADMINISTER = (
+    r"(?:give|gives|giving|given|administer|administers|administered|"
+    r"inject|injects|injected|injection|drench|drenches|drenched|"
+    r"dose|doses|dosed|dosing|apply|applies|applied|application|"
+    r"spray|sprays|sprayed|mix|mixes|mixed|add|adds|added|"
+    r"use|uses|using|treat|treats|treated|dissolve|dissolves|dilute|dilutes)"
+)
+
+#: Nouns that make a quantity DESCRIPTIVE rather than a dose.
+#:
+#: "Give the 20 kg goat clean water" and "store in a 50 kg bag" both put an
+#: administration verb near a quantity, and neither is a dose. Redacting them
+#: would turn ordinary advice into "[rate not given in the sources]", which is
+#: a worse failure than the leak - it destroys correct advice rather than
+#: withholding an invented figure.
+_DESCRIPTIVE_AFTER = (
+    r"(?:bags?|sacks?|body\s*weight|goats?|cows?|"
+    r"sheep|cattle|animals?|birds?|chickens?|hens?|tubers?|baskets?|crates?|"
+    r"drums?|buckets?|containers?|bottles?|jerry\s*cans?)"
 )
 
 _DOSAGE_PATTERNS = [
-    # 2 litres per hectare, 500 ml/ha, 1.5 kg per acre
+    # 2 litres per hectare, 500 ml/ha, 1.5 kg per acre, 5 ml per 50 kg body
+    # weight, 10 ml per animal. The optional second quantity keeps the whole
+    # rate in one match, so redaction does not leave "per 50 kg body weight"
+    # dangling after the figure it qualifies has gone.
     re.compile(
-        rf"\b\d+(?:[.,]\d+)?\s*{_UNIT}\s*(?:per|/)\s*{_PER_UNIT}\b",
+        # The substance may sit between the amount and the "per":
+        # "5 ml OF IVERMECTIN per 50 kg body weight". Requiring them to be
+        # adjacent matched only the amount, leaving "per 50 kg body weight"
+        # dangling after the figure it qualifies had been redacted.
+        rf"\b\d+(?:[.,]\d+)?\s*{_UNIT}\b[^.]{{0,24}}?\s*(?:per|/|every)\s*"
+        rf"(?:\d+(?:[.,]\d+)?\s*)?{_PER_UNIT}(?:\s*body\s*weight)?\b",
         re.IGNORECASE,
     ),
     # 20 ml in 20 litres of water
@@ -133,13 +186,27 @@ _DOSAGE_PATTERNS = [
         rf"[^.]{{0,20}}?\b\d+(?:[.,]\d+)?\s*(?:litres?|liters?|gallons?|l)\b",
         re.IGNORECASE,
     ),
+    # A BARE dose: an administration verb, then a quantity, with no "per" at
+    # all. "Give 5 ml of ivermectin to the goat."
+    #
+    # Guarded two ways, because this is the pattern that can eat real advice:
+    # the verb must be within a short window, and the unit must not be followed
+    # by a noun that makes the quantity descriptive ("a 20 kg goat").
+    re.compile(
+        # Only the QUANTITY is captured, not the verb. Capturing the whole
+        # span made containment compare "Use 500 ml" against a source that
+        # says "500 ml / ha" - so a correctly GROUNDED rate was reported as
+        # invented and would have been redacted out of a good answer.
+        rf"\b{_ADMINISTER}\b[^.]{{0,25}}?\b(?P<dose>\d+(?:[.,]\d+)?\s*{_UNIT})\b"
+        rf"(?!\s*(?:of\s+)?{_DESCRIPTIVE_AFTER}\b)",
+        re.IGNORECASE,
+    ),
     # dilution ratios: 1:200
     re.compile(r"\b(?:dilut|ratio|mix)\w*[^.]{0,25}?\b\d+\s*:\s*\d+\b", re.IGNORECASE),
     # concentration: 0.5% solution
     re.compile(r"\b\d+(?:[.,]\d+)?\s*%\s*(?:solution|concentration|a\.i\.|active)",
                re.IGNORECASE),
 ]
-
 #: Words that signal the surrounding text is about chemical control at all.
 #: Used to decide whether the recency rule is even relevant to a passage.
 _CHEMICAL_CONTEXT = re.compile(
@@ -317,7 +384,12 @@ def find_hazardous_actives(text: str) -> list[str]:
 def find_dosages(text: str) -> list[str]:
     found: list[str] = []
     for pattern in _DOSAGE_PATTERNS:
-        found.extend(match.group(0).strip() for match in pattern.finditer(text))
+        for match in pattern.finditer(text):
+            # A pattern may capture the quantity alone in `dose`, so that the
+            # containment check compares what the source would carry rather
+            # than the sentence built around it.
+            span = match.groupdict().get("dose") or match.group(0)
+            found.append(span.strip())
     # Preserve order, drop duplicates.
     seen: set[str] = set()
     unique = []

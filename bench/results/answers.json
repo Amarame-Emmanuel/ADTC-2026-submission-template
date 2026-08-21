@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-08-19T19:54:41+00:00",
+  "generated_at": "2026-08-21T19:53:11+00:00",
   "split": "dev",
   "n_in_scope": 33,
   "n_out_scope": 9,
-  "elapsed_s": 579.0,
+  "elapsed_s": 619.2,
   "answer_accuracy": 0.9394,
   "counts": {
     "OK": 31,
@@ -90,7 +90,7 @@
         "planting material",
         "healthy"
       ],
-      "answer_head": "Select and use improved, healthy, and pest/disease free cassava stems. Cut the stems into several 2-node or 3-node stakes using secateurs, a sharp knife/machete, or a stake cutting machine. Avoid destroying nodes and jag"
+      "answer_head": "To avoid sickly cassava stems and ensure a healthy crop, select and use improved, healthy, and pest/disease-free cassava stems. Cut the stems into several 2-node or 3-node stakes using secateurs, a sharp knife/machete, o"
     },
     {
       "id": "crop-04",
@@ -178,7 +178,6 @@
         "borer"
       ],
       "terms_in_answer": [
-        "stem borer",
         "borer"
       ],
       "terms_in_sources": [
@@ -187,7 +186,7 @@
         "chilo",
         "borer"
       ],
-      "answer_head": "To prevent the stems of your maize from breaking and to avoid holes, start by removing crop residues from the field and feeding them to livestock or making compost. This practice helps break the cycle of the maize stalk "
+      "answer_head": "To prevent your maize from breaking and holes appearing in the stems, start by removing crop residues from the field after harvest. Spread the residue on the soil surface in the hot sun, then compost it. This practice he"
     },
     {
       "id": "crop-13",
@@ -409,6 +408,8 @@
         "pod borer"
       ],
       "terms_in_answer": [
+        "thrips",
+        "maruca",
         "flower"
       ],
       "terms_in_sources": [
@@ -417,7 +418,7 @@
         "flower",
         "pod borer"
       ],
-      "answer_head": "To prevent the flowers from falling off before they make pods, you can use a branch to prop up the flower. This will help the pods develop properly. If you notice any holes in the pods from feeding by pests, remove the a"
+      "answer_head": "To address the issue of cowpea flowers falling off before forming pods, start by checking for pests such as Maruca vitrata, thrips, and Anoplocnemis curvipes. Ensure that your plants are well-watered and provided with ad"
     },
     {
       "id": "crop-34",

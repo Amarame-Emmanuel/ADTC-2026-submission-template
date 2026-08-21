@@ -1421,3 +1421,71 @@ inside `"_FOREIGN_MONEY = re.compile("` and corrupted the file - the substring
 defect of F-31, on this same name, for the second time. A `\b` written through
 a heredoc reached disk as a 0x08 backspace again; `tests/test_source_hygiene.py`
 caught it before it could compile into a pattern that matches nothing.
+
+### F-37 · The dosage backstop covered crop rates and not veterinary doses
+**Severity: HIGH — FIXED.**
+
+The scope rule declines dosage QUESTIONS. The answer-side guard is what catches
+a dose appearing in an answer to a question that was not dosage-shaped. Streamed
+through the interface, four of five ordinary dose sentences passed untouched:
+
+    "Give 5 ml of ivermectin per 50 kg body weight"   -> not found
+    "Inject 2.5 mg/kg of oxytetracycline once daily"  -> not found
+    "Apply 250 ml of the chemical per hectare"        -> not found
+    "Drench with 10 ml per animal"                    -> not found
+    "Use 1.5 litres per hectare"                      -> found
+
+Not the token boundary it was suspected of. Every rate pattern required a
+per-AREA unit - hectare, acre, m2, litre - so the guard covered crop spray rates
+and left VETERINARY DOSING, the higher-harm half, entirely open. `mg` was not a
+unit it knew; neither were tablets, sachets, drops or cc.
+
+A dose comes in three shapes and one was handled: rate ("2 litres per hectare"),
+ratio ("2.5 mg/kg"), and BARE ("Give 5 ml of ivermectin") with no "per" at all.
+The bare shape is the dangerous one and the hardest to match safely, since a
+number and a unit are also how ordinary advice is written. It is keyed on an
+administration VERB near the quantity and refuses to fire when the unit is
+followed by a noun that makes the quantity descriptive - "a 20 kg goat".
+
+**Matching is not redacting, and that is what makes generosity safe.**
+`find_dosages` proposes; containment against the sources disposes. But only if
+the match is the QUANTITY and not the sentence around it: capturing the whole
+span made containment compare "Use 500 ml" against a source reading
+"500 ml / ha", so a correctly GROUNDED rate was reported as invented and would
+have been redacted out of a good answer.
+
+**Measured: 4 of 5 leaking before, 0 of 5 after, and 0 spurious redactions
+across 12 real answers.** Answer accuracy unchanged at 93.9%, UNGROUNDED 0.
+
+### F-38 · The flagship diagnosis is unstable, and every metric is green
+**Severity: HIGH — OPEN.**
+
+F-06 and the report's §6.8 record that "my cassava leaves are yellow and
+twisted" answered Cassava Brown Streak Disease for textbook mosaic symptoms, and
+that a chunk-boundary fix corrected it. The correction was measured ONCE.
+
+Twelve runs, same question, same path:
+
+| answer names | runs |
+|---|---|
+| brown streak first, or alone | **4 / 12** |
+| no disease at all | 7 / 12 |
+| mosaic first | 1 / 12 |
+
+The chunk fix is real. "The diagnosis is now correct" was never established.
+
+**It is invisible to everything.** Answer accuracy reads 93.9% with UNGROUNDED 0
+and MISSED 0, because the expected terms for this question are control practices
+and the answer contains them. Naming the WRONG DISEASE while giving broadly
+reasonable cultural advice passes every automated check in this project - and
+bench/answers.py was built specifically to catch what coverage could not.
+
+**How it was found matters as much as the number.** By running
+`make verify-offline` - a target whose purpose is to prove there is no network -
+and reading what it printed. The proof passed; the answer inside it was wrong.
+Three of the four worst defects in this project were found this way, by reading
+output while looking for something else.
+
+**Not fixed.** Closing it needs either the claim-level check that F-20 describes
+and nobody built, or making the disease name a scored term rather than an
+incidental one. Recorded as REPORT.md §7.24.
