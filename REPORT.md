@@ -903,8 +903,8 @@ quantisation format, not the parameter count, decides `S_perf`).
 | Peak RSS, full application | **1.63 GB** | 7 GB — **PASS**, → `S_eff` **76.7** |
 | RSS after model load, before generation | 1.41 GB | — |
 | Throughput, **audit build** (`llama-bench`, scalar) | **30.07 tok/s** | 2.0× `TPS_REFERENCE` 15.0 → `S_perf` **100**, capped — §3.3b |
-| Throughput, dev build (full application) | 32.8 tok/s (p50) | not scored; SIMD favours K-quants |
-| Time to first token (p50 / p95, dev build) | **21.3 s / 24.1 s** | — |
+| Throughput, dev build (full application) | 33.0 tok/s (p50) | not scored; SIMD favours K-quants |
+| Time to first token (p50 / p95, dev build) | **19.7 s / 21.9 s** | — |
 | Prompt size sent to the model | ~652 tokens | — |
 | Warm-up (startup, one-off) | 0.4 s | — |
 | ARC-Easy `acc` / `acc_norm` (**full 2,376-question test set**) | **0.7449 / 0.737** | 95% CI ±1.8 pp; smaller samples are biased, not just noisy — see §3.3 |
@@ -913,12 +913,13 @@ quantisation format, not the parameter count, decides `S_perf`).
 | Retrieval latency p50 / p95 | 64 ms / 94 ms | — |
 | Searchable index | **40,537 chunks / 995 documents** | — |
 | Index build, 43,177 chunks | one-off, peak 0.55 GB | one-off |
-| Sustained-load throughput decay (20 min continuous) | **1.0%** | <10% — no throttling signature (§6.7) |
+| Sustained-load throughput decay (20 min continuous) | **−1.0%** (throughput *rose*) | <10% — no throttling signature (§6.7) |
 | Peak core temperature | null — host exposes no sensor (§6.7) | 85 °C penalty threshold |
 | **Offline operation** | **verified, `--network none`** | — |
 
-Every row above is read from `bench/results/benchmark.json`, `coverage.json` and
-`thermal.json`, regenerated on 2026-08-14 and committed alongside this report.
+Every row above is read from `bench/results/benchmark.json`, `coverage.json`,
+`answers.json` and `thermal.json`, regenerated on 2026-08-21 against the
+committed tree and committed alongside this report.
 That provenance sentence is here because it was not true of the previous version
 of this table, and the failure is instructive enough to record rather than
 quietly correct.
@@ -937,6 +938,34 @@ precisely why it went unnoticed for so long: a hand-maintained number that
 happens to be pessimistic raises no alarm and still cannot be reproduced by a
 reviewer. §8 claims every figure traces to a committed script. Until this run,
 the headline table was the one place that claim did not hold.
+
+**The final verification run found a hole in this artifact, not in the system.**
+Re-measured at the close of the project, peak RSS came back at **1.63 GB —
+identical to the committed figure**, and throughput at 33.0 tok/s against 32.8,
+which is noise. But TTFT read **13.3 s** against a committed 21.3 s, and there
+was no way to tell an improvement from a measurement artefact, because
+`benchmark.json` recorded the thread COUNT and not WHICH CORES.
+
+Those are not the same thing. A run pinned to cores 8-15 and one pinned to 0-3
+both report "4 threads configured" and produce different latency, because they
+do not share a cache or contend with the same neighbours. Re-run on the original
+cpuset, TTFT came back at **19.7 s / 21.9 s** — a real but modest improvement,
+with the rest of the gap explained by the cores.
+
+§6.5 records a 30× measurement error caused by container configuration. This is
+the same class one notch smaller: **the setting that invalidates the comparison
+was not being written down.** `bench/run.py` and `bench/thermal.py` now record
+the cpuset from `sched_getaffinity` — the truth at runtime, whatever set it —
+so a future run can be compared to this one instead of guessed at.
+
+**The thermal row moved too, and the first explanation for it was wrong.** A run
+on cores 8-15 gave −2.7% against a committed 1.0% on 0-3, and the cpuset was the
+obvious culprit. Repeating it on the *same* cores gave **−1.0%** — a 1.7-point
+spread with nothing changed. So the difference is run-to-run variance, not the
+cores, and the decay metric has a resolution of roughly ±2 points at this
+duration. Recorded rather than quietly corrected, because a plausible cause that
+survives one measurement and dies to a repeat is the failure mode this whole
+section exists to catch.
 
 **Predicted 1.85 GB; measured 1.71 GB.** The previous prediction was 3.26 GB —
 a 1.5 GB miss that §6.0 explained away as conservatism, on the grounds that it
@@ -1254,15 +1283,32 @@ matters to a farmer — the answer getting slower. `make thermal` generates
 continuously for 20 minutes, a duty cycle far above real request-driven use,
 and compares the last quarter's throughput against the first:
 
-| | Measured |
-|---|---|
-| Continuous generation | 20 min, 40 full answers |
-| Throughput, first quarter | 38.07 tok/s |
-| Throughput, last quarter | 37.68 tok/s |
-| **Decay** | **1.0%** (alert threshold 10%) |
-| Peak core temperature | null — sensors unavailable, stated above |
+| | 08-14, cores 0-3 | 08-21 run A, cores 8-15 | 08-21 run B, cores 8-15 |
+|---|---|---|---|
+| Continuous generation | 20 min, 40 answers | 20 min, 61 answers | 20 min, 59 answers |
+| Throughput, first quarter | 38.07 tok/s | 33.44 tok/s | 34.26 tok/s |
+| Throughput, last quarter | 37.68 tok/s | 34.33 tok/s | **34.60 tok/s** |
+| **Decay** | **1.0%** | **−2.7%** | **−1.0%** |
+| Peak core temperature | null | null | null |
 
-Flat throughput under sustained worst-case load is positive evidence of no
+**Three runs are reported rather than the newest replacing the older, and run B
+exists because run A's explanation was wrong.** A −2.7% reading against a
+committed 1.0% looked like the cpuset — different cores do not share a cache or
+contend with the same neighbours. Repeating on the *same* cores gave −1.0%.
+**A 1.7-point spread with nothing changed means the cause was variance, not
+cores**, and it means this metric resolves to about ±2 points at 20 minutes.
+
+Recording the cpuset was still worth doing, and was itself a finding of the
+final verification pass: the artifacts stored the thread *count* and not *which
+cores*, so a 13.3 s TTFT reading could not be distinguished from a measurement
+artefact until it was re-run (§6.0). Both `bench/run.py` and `bench/thermal.py`
+now record it. The lesson is the narrower one — **a single run cannot separate a
+cause from noise, and the fix for that is a repeat, not a better explanation.**
+
+The verdict is identical either way, which is the point: **throughput did not
+fall under sustained load, so `P_thermal` is 0.**
+
+Flat-or-rising throughput under sustained worst-case load is positive evidence of no
 throttling on this host — held, incidentally, while an unrelated container
 image was building on the same machine. What transfers to the target laptop is
 not that verdict but the workload's shape: four pinned threads, bandwidth-bound

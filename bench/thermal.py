@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import statistics
 import threading
@@ -202,6 +203,13 @@ def _summarise(samples: list[dict], sampler: Sampler, duration_s: int) -> dict:
             "cpu": platform.processor() or platform.machine(),
             "logical_cpus": psutil.cpu_count(),
             "platform": platform.platform(),
+            # WHICH cores, for the same reason bench/run.py records it: a
+            # sustained-load result is only comparable to another run on the
+            # same cores. Two runs both reporting "4 threads" can differ
+            # because they do not share a cache or contend with the same
+            # neighbours, and decay is exactly the quantity that difference
+            # shows up in.
+            "cpuset": _cpuset(),
         },
         "duration_s": duration_s,
         "answers_generated": len(samples),
@@ -217,6 +225,23 @@ def _summarise(samples: list[dict], sampler: Sampler, duration_s: int) -> dict:
         "samples": samples,
     }
 
+
+def _cpuset() -> str:
+    """The cores this process may actually run on, as the OS reports them."""
+    try:
+        cores = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        return "unknown"
+    if not cores:
+        return "unknown"
+    parts: list[str] = []
+    start = prev = cores[0]
+    for core in cores[1:] + [None]:
+        if core != prev + 1:
+            parts.append(str(start) if start == prev else f"{start}-{prev}")
+            start = core
+        prev = core
+    return ",".join(parts)
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)

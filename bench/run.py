@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import statistics
 import time
@@ -100,12 +101,50 @@ def cgroup_memory_limit() -> int | None:
 # Host description
 # ---------------------------------------------------------------------------
 
+def _cpuset() -> str:
+    """The cores this process may actually run on, as the OS reports them.
+
+    `sched_getaffinity` rather than the docker flag, because it is the truth at
+    runtime whatever set it - the flag, a taskset, or nothing at all.
+    """
+    try:
+        cores = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        return "unknown"
+    if not cores:
+        return "unknown"
+    # Collapse runs into ranges: [8,9,10,11] -> "8-11".
+    parts: list[str] = []
+    start = prev = cores[0]
+    for core in cores[1:] + [None]:
+        if core != prev + 1:
+            parts.append(str(start) if start == prev else f"{start}-{prev}")
+            start = core
+        prev = core
+    return ",".join(parts)
+
+
 def host_info() -> dict:
     info: dict = {
         "platform": platform.platform(),
         "machine": platform.machine(),
         "python": platform.python_version(),
         "threads_configured": config.DEFAULT_THREADS,
+        # WHICH cores, not just how many.
+        #
+        # This file is the artifact §6.0 of REPORT.md claims every figure traces
+        # back to, and it recorded the thread COUNT while omitting the cpuset.
+        # Those are not the same thing: a run pinned to cores 8-15 and one
+        # pinned to 0-3 both report "4 threads configured" and produce
+        # different latency, because they do not share a cache or contend with
+        # the same neighbours. A final verification run measured TTFT p50 at
+        # 13.3s against a committed 21.3s and there was no way, from the file
+        # alone, to tell an improvement from a different cpuset.
+        #
+        # §6.5 records a 30x measurement error caused by container
+        # configuration. This is the same class: the setting that invalidates
+        # the comparison was not being written down.
+        "cpuset": _cpuset(),
     }
 
     try:
@@ -283,7 +322,8 @@ def print_report(r: dict) -> None:
     print(f"  host        {host.get('cpu', 'unknown')}")
     print(f"              {host.get('cpu_count_logical', '?')} logical CPUs, "
           f"{host.get('total_ram_gb', '?')} GB RAM, "
-          f"{host['threads_configured']} threads configured")
+          f"{host['threads_configured']} threads configured "
+          f"on cores {host.get('cpuset', 'unknown')}")
     cap = host.get("cgroup_memory_limit_gb")
     print(f"  enforced    {f'{cap} GB cgroup limit' if cap else 'NO MEMORY CAP ENFORCED'}")
     print(f"  model       {r['models']['llm']} @ {r['models']['n_ctx']} ctx")
